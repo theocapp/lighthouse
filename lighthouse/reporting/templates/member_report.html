@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lighthouse — {{ report.member.full_name }} Conflict Report</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; color: #222; }
+    header { background: #1a2744; color: white; padding: 1.5rem 2rem; }
+    header h1 { font-size: 1.4rem; font-weight: 600; }
+    header p { opacity: 0.7; font-size: 0.85rem; margin-top: 0.25rem; }
+    .container { max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; }
+
+    .member-card { background: white; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); display: flex; gap: 2rem; flex-wrap: wrap; }
+    .member-card .name { font-size: 1.4rem; font-weight: 700; }
+    .member-card .meta { color: #555; font-size: 0.9rem; margin-top: 0.3rem; }
+    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .badge-D { background: #dbeafe; color: #1d4ed8; }
+    .badge-R { background: #fee2e2; color: #b91c1c; }
+    .badge-I { background: #f3f4f6; color: #374151; }
+
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-card { background: white; border-radius: 8px; padding: 1.2rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); text-align: center; }
+    .stat-card .value { font-size: 2rem; font-weight: 700; }
+    .stat-card .label { font-size: 0.78rem; color: #666; text-transform: uppercase; letter-spacing: .05em; margin-top: 0.3rem; }
+    .stat-high { color: #b91c1c; }
+    .stat-medium { color: #d97706; }
+    .stat-low { color: #059669; }
+
+    .section { background: white; border-radius: 8px; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); overflow: hidden; }
+    .section-header { padding: 1rem 1.5rem; border-bottom: 1px solid #eee; font-weight: 600; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; }
+    .section-header .count { font-size: 0.8rem; color: #888; font-weight: 400; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th { background: #f9fafb; padding: 0.7rem 1rem; text-align: left; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .05em; color: #555; border-bottom: 1px solid #eee; }
+    td { padding: 0.75rem 1rem; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+
+    .score-pill { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 20px; font-weight: 700; font-size: 0.8rem; }
+    .conf-high { background: #fee2e2; color: #b91c1c; }
+    .conf-medium { background: #fef3c7; color: #92400e; }
+    .conf-low { background: #d1fae5; color: #065f46; }
+
+    .type-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; background: #e0e7ff; color: #3730a3; font-weight: 500; }
+
+    .evidence { font-size: 0.82rem; color: #555; margin-top: 0.3rem; }
+    .empty { padding: 2rem; text-align: center; color: #888; font-size: 0.9rem; }
+    footer { text-align: center; padding: 2rem; color: #888; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Lighthouse — Congressional Conflict of Interest Report</h1>
+  <p>Generated {{ report.generated_at }} · Data from Congress.gov, SEC EDGAR, House/Senate Financial Disclosures, OpenFEC</p>
+</header>
+
+<div class="container">
+
+  <!-- Member Card -->
+  <div class="member-card">
+    <div>
+      <div class="name">{{ report.member.full_name }}</div>
+      <div class="meta" style="margin-top: 0.5rem">
+        <span class="badge badge-{{ report.member.party }}">{{ report.member.party }}</span>
+        &nbsp;{{ report.member.chamber | title }} ·
+        {{ report.member.state }}{% if report.member.district %}-{{ report.member.district }}{% endif %}
+      </div>
+    </div>
+    <div style="margin-left: auto;">
+      <div style="font-size:0.8rem; color:#888;">Committees</div>
+      {% for c in report.summary.committees %}
+        <div style="font-size:0.85rem;">{{ c }}</div>
+      {% else %}
+        <div style="font-size:0.85rem; color:#aaa;">None recorded</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Summary Stats -->
+  <div class="summary-grid">
+    <div class="stat-card">
+      <div class="value">{{ report.summary.total_conflicts }}</div>
+      <div class="label">Total Conflicts</div>
+    </div>
+    <div class="stat-card">
+      <div class="value stat-high">{{ report.summary.high_confidence }}</div>
+      <div class="label">High Confidence</div>
+    </div>
+    <div class="stat-card">
+      <div class="value stat-medium">{{ report.summary.medium_confidence }}</div>
+      <div class="label">Medium Confidence</div>
+    </div>
+    <div class="stat-card">
+      <div class="value stat-low">{{ report.summary.low_confidence }}</div>
+      <div class="label">Low Confidence</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">{{ report.summary.max_score }}</div>
+      <div class="label">Max Score</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">{{ report.summary.total_assets }}</div>
+      <div class="label">Assets Disclosed</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">{{ report.summary.total_transactions }}</div>
+      <div class="label">Stock Trades</div>
+    </div>
+  </div>
+
+  <!-- Conflicts Table -->
+  <div class="section">
+    <div class="section-header">
+      Detected Conflicts
+      <span class="count">{{ report.conflicts | length }} records</span>
+    </div>
+    {% if report.conflicts %}
+    <table>
+      <thead>
+        <tr>
+          <th>Score</th>
+          <th>Type</th>
+          <th>Evidence</th>
+          <th>Bill / Vote</th>
+          <th>Asset / Ticker</th>
+          <th>Detected</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in report.conflicts %}
+        <tr>
+          <td>
+            <span class="score-pill conf-{{ c.confidence }}">{{ c.score }}</span>
+          </td>
+          <td><span class="type-badge">{{ c.conflict_type | replace('_', ' ') }}</span></td>
+          <td>
+            <div>{{ c.evidence_summary }}</div>
+          </td>
+          <td style="font-size:0.8rem; color:#555;">
+            {% if c.bill_id %}<div>{{ c.bill_id }}</div>{% endif %}
+            {% if c.vote_id %}<div>{{ c.vote_id }}</div>{% endif %}
+          </td>
+          <td style="font-size:0.8rem; color:#555;">
+            {% set detail = c.detail_json | fromjson if c.detail_json else {} %}
+            {% if detail.ticker %}<div><strong>{{ detail.ticker }}</strong></div>{% endif %}
+            {% if detail.asset_name %}<div>{{ detail.asset_name[:40] }}</div>{% endif %}
+          </td>
+          <td style="font-size:0.78rem; color:#888;">{{ c.detected_at[:10] if c.detected_at else '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No conflicts detected for this member.</div>
+    {% endif %}
+  </div>
+
+  <!-- Recent Stock Transactions -->
+  <div class="section">
+    <div class="section-header">
+      Recent Stock Transactions (STOCK Act Disclosures)
+      <span class="count">{{ report.recent_transactions | length }} shown</span>
+    </div>
+    {% if report.recent_transactions %}
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Ticker</th>
+          <th>Asset</th>
+          <th>Type</th>
+          <th>Amount Range</th>
+          <th>Owner</th>
+          <th>Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in report.recent_transactions %}
+        <tr>
+          <td>{{ t.transaction_date or '—' }}</td>
+          <td><strong>{{ t.ticker or '—' }}</strong></td>
+          <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ t.asset_name or '—' }}</td>
+          <td>{{ t.transaction_type or '—' }}</td>
+          <td style="font-size:0.82rem; color:#555;">
+            {% if t.amount_min %}${{ '{:,.0f}'.format(t.amount_min) }} – {% endif %}
+            {% if t.amount_max %}${{ '{:,.0f}'.format(t.amount_max) }}{% endif %}
+          </td>
+          <td>{{ t.owner or 'self' }}</td>
+          <td style="font-size:0.78rem; color:#888;">{{ t.source or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No stock transactions found.</div>
+    {% endif %}
+  </div>
+
+  <!-- Disclosed Assets -->
+  <div class="section">
+    <div class="section-header">
+      Disclosed Assets (Financial Disclosures)
+      <span class="count">{{ report.assets | length }} records</span>
+    </div>
+    {% if report.assets %}
+    <table>
+      <thead>
+        <tr>
+          <th>Asset</th>
+          <th>Ticker</th>
+          <th>Type</th>
+          <th>Value Range</th>
+          <th>Owner</th>
+          <th>Sector</th>
+          <th>Year</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in report.assets %}
+        <tr>
+          <td style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.asset_name }}</td>
+          <td><strong>{{ a.ticker or '—' }}</strong></td>
+          <td>{{ a.asset_type or '—' }}</td>
+          <td style="font-size:0.82rem; color:#555;">
+            {% if a.value_min %}${{ '{:,.0f}'.format(a.value_min) }} – {% endif %}
+            {% if a.value_max %}${{ '{:,.0f}'.format(a.value_max) }}{% endif %}
+          </td>
+          <td>{{ a.owner or 'self' }}</td>
+          <td>{{ a.sector or '—' }}</td>
+          <td>{{ a.year or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No disclosed assets found.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<footer>
+  <p>Lighthouse · Built with public data from Congress.gov, SEC EDGAR, House &amp; Senate Financial Disclosures, and the Federal Election Commission.</p>
+  <p style="margin-top:0.5rem;">This report flags potential conflicts of interest for public transparency. It does not constitute legal findings or accusations of wrongdoing.</p>
+</footer>
+
+</body>
+</html>

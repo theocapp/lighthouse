@@ -1,0 +1,286 @@
+
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="library-h1" tabindex="0">FINANCIAL DISCLOSURE REPORTS</h1>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-12">
+        <h2>Financial Disclosure Reports Database</h2>
+        <hr />
+        <p>
+            It is unlawful to use the information contained in these Financial Disclosure Statements for (A) any unlawful purpose, (B) any commercial purpose, other than by news and communications media for dissemination to the general public, (C) determining or establishing the credit rating of any individual, or (D) use, directly or indirectly, in the solicitation of money for any political, charitable, or other purpose. See 5 U.S.C. app. § 105(c)(1),(2).
+
+            In conformity with 2 U.S.C. § 104e(b)(3), certain personally identifiable information in these reports, not required to be disclosed, has been redacted.
+        </p>
+    </div>
+</div>
+<div id="search-content" class="container sub-nav_home hidden-print">
+    <div class="row">
+        <div class="lcs-tabs">
+            <div class="sub-nav">
+                <ul id="section-tabs" class="nav nav-tabs sub-nav_list" data-load-views="true" role="tablist">
+                    <li role="tab" class="active">
+                        <a href="#search-members" data-toggle="tab" class="init" tabindex="0">
+                            <span class="nowrap">Search Members</span>
+                        </a>
+                    </li>
+                    <li role="tab">
+                        <a href="#search-candidates" data-toggle="tab" tabindex="0">
+                            <span class="nowrap">Search Candidates</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="container tab-content" aria-live="polite">
+            <div role="tabpanel" class="tab-pane library-tab_pane active" id="search-members" tabindex="0" aria-labelledby="home-tab1">
+                
+<form action="/FinancialDisclosure/ViewMemberSearchResult" class="search-filter" method="post">    <div class="row">
+        <div class="col-xl-5 col-md-6 col-sm-6">
+            <div class="form-group library-form_group">
+                <label class="library-form_label" for="LastName" id="member-lastName-label">LAST NAME</label>
+                <input class="form-control library-form_control" data-val="true" data-val-required="The LastName field is required." id="LastName" name="LastName" type="text" value="" />
+            </div>
+        </div>
+        <div class="col-xl-3 col-lg-4 col-md-5 col-sm-6">
+            <div class="form-group library-form_group">
+                <label class="library-form_label" for="FilingYear" id="member-filingYear-label">Filing Year</label>
+                <select class="form-control library-form_control library-form_select" data-val="true" data-val-required="The FilingYear field is required." id="FilingYear" name="FilingYear"><option value="">Select one</option>
+<option value="2008">2008</option>
+<option value="2009">2009</option>
+<option value="2010">2010</option>
+<option value="2011">2011</option>
+<option value="2012">2012</option>
+<option value="2013">2013</option>
+<option value="2014">2014</option>
+<option value="2015">2015</option>
+<option value="2016">2016</option>
+<option value="2017">2017</option>
+<option value="2018">2018</option>
+<option value="2019">2019</option>
+<option value="2020">2020</option>
+<option value="2021">2021</option>
+<option value="2022">2022</option>
+<option value="2023">2023</option>
+<option value="2024">2024</option>
+<option value="2025">2025</option>
+<option value="2026">2026</option>
+</select>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            <label for="formGroupInput" class="library-form_label">Office</label>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-xl-5 col-md-6 col-sm-6">
+            <div class="form-group library-form_group">
+                <label class="library-form_label" for="State" id="member-state-label">State</label>
+                <select class="form-control library-form_control library-form_select" data-val="true" data-val-required="The State field is required." id="State" name="State"><option value="">Select one</option>
+<option value="AL">Alabama</option>
+<option value="AK">Alaska</option>
+<option value="AS">American Samoa</option>
+<option value="AZ">Arizona</option>
+<option value="AR">Arkansas</option>
+<option value="CA">California</option>
+<option value="CO">Colorado</option>
+<option value="CT">Connecticut</option>
+<option value="DC">District of Columbia</option>
+<option value="DE">Delaware</option>
+<option value="FL">Florida</option>
+<option value="GA">Georgia</option>
+<option value="GU">Guam</option>
+<option value="HI">Hawaii</option>
+<option value="ID">Idaho</option>
+<option value="IL">Illinois</option>
+<option value="IN">Indiana</option>
+<option value="IA">Iowa</option>
+<option value="KS">Kansas</option>
+<option value="KY">Kentucky</option>
+<option value="LA">Louisiana</option>
+<option value="ME">Maine</option>
+<option value="MD">Maryland</option>
+<option value="MA">Massachusetts</option>
+<option value="MI">Michigan</option>
+<option value="MN">Minnesota</option>
+<option value="MS">Mississippi</option>
+<option value="MO">Missouri</option>
+<option value="MT">Montana</option>
+<option value="NE">Nebraska</option>
+<option value="NV">Nevada</option>
+<option value="NH">New Hampshire</option>
+<option value="NJ">New Jersey</option>
+<option value="NM">New Mexico</option>
+<option value="NY">New York</option>
+<option value="NC">North Carolina</option>
+<option value="ND">North Dakota</option>
+<option value="MP">Northern Mariana Islands</option>
+<option value="OH">Ohio</option>
+<option value="OK">Oklahoma</option>
+<option value="OR">Oregon</option>
+<option value="PA">Pennsylvania</option>
+<option value="PR">Puerto Rico</option>
+<option value="RI">Rhode Island</option>
+<option value="SC">South Carolina</option>
+<option value="SD">South Dakota</option>
+<option value="TN">Tennessee</option>
+<option value="TX">Texas</option>
+<option value="UT">Utah</option>
+<option value="VT">Vermont</option>
+<option value="VI">Virgin Islands</option>
+<option value="VA">Virginia</option>
+<option value="WA">Washington</option>
+<option value="WV">West Virginia</option>
+<option value="WI">Wisconsin</option>
+<option value="WY">Wyoming</option>
+</select>
+            </div>
+        </div>
+        <div class="col-xl-5 col-md-6 col-sm-6">
+            <div class="form-group library-form_group">
+                <label class="library-form_label" for="District" id="member-district-label">District</label>
+                <input class="form-control library-form_control" data-val="true" data-val-required="The District field is required." id="District" name="District" type="text" value="" />
+            </div>
+        </div>
+    </div>
+    <div class="form-group library-form_group">
+            <button aria-label="search button" title="Search" class="btn btn-library col-xs-12 col-sm-3" type="submit">Search</button>
+            <button aria-label="clear button" title="Clear" class="btn btn-library col-xs-12 col-sm-3 clearBtn" type="button">Clear</button>
+    </div>
+<input name="__RequestVerificationToken" type="hidden" value="CfDJ8FcoNu7-fJNHr-AhBT2v7PmfwcvmgY9Cv1g4fxH2DfjZ4rJf6C3omAX5fgTz_ujRDxNPcIHsGgmuCBiSGcH1AhcOC8s3LMP0-cU5uOUFfCL8CXWFjeWzdDOdxYoHxAKS0kR8gCLfxt_wmo7ls-hhhmo" /></form>
+            </div>
+            <div role="tabpanel" class="tab-pane library-tab_pane" id="search-candidates" tabindex="0" aria-labelledby="home-tab2">
+                
+<form action="/FinancialDisclosure/ViewCandidateSearchResult" class="search-filter" method="post">    <div class="row">
+        <div class="col-xl-5 col-md-6 col-sm-6">
+            <div class="form-group library-form_group">
+                <label class="library-form_label" for="LastName" id="candidate-lastName-label">LAST NAME</label>
+                <input class="form-control library-form_control" data-val="true" data-val-required="The LastName field is required." id="LastName" name="LastName" type="text" value="" />
+            </div>
+        </div>
+        <div class="col-xl-3 col-lg-4 col-md-5 col-sm-6">
+            <div class="form-group library-form_group">
+                <label class="library-form_label" for="ElectionYear" id="candidate-electionYear-label">Election Year</label>
+                <select class="form-control library-form_control library-form_select" data-val="true" data-val-required="The ElectionYear field is required." id="ElectionYear" name="ElectionYear"><option value="">Select one</option>
+<option value="2011">2011</option>
+<option value="2012">2012</option>
+<option value="2013">2013</option>
+<option value="2014">2014</option>
+<option value="2015">2015</option>
+<option value="2016">2016</option>
+<option value="2017">2017</option>
+<option value="2018">2018</option>
+<option value="2019">2019</option>
+<option value="2020">2020</option>
+<option value="2021">2021</option>
+<option value="2022">2022</option>
+<option value="2023">2023</option>
+<option value="2024">2024</option>
+<option value="2025">2025</option>
+<option value="2026">2026</option>
+<option value="2027">2027</option>
+</select>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            <label for="formGroupInput" class="library-form_label">Office</label>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-xl-5 col-md-6 col-sm-6">
+            <div class="form-group library-form_group">
+                <label class="library-form_label" for="State" id="candidate-state-label">State</label>
+                <select class="form-control library-form_control library-form_select" data-val="true" data-val-required="The State field is required." id="State" name="State"><option value="">Select one</option>
+<option value="AL">Alabama</option>
+<option value="AK">Alaska</option>
+<option value="AS">American Samoa</option>
+<option value="AZ">Arizona</option>
+<option value="AR">Arkansas</option>
+<option value="CA">California</option>
+<option value="CO">Colorado</option>
+<option value="CT">Connecticut</option>
+<option value="DC">District of Columbia</option>
+<option value="DE">Delaware</option>
+<option value="FL">Florida</option>
+<option value="GA">Georgia</option>
+<option value="GU">Guam</option>
+<option value="HI">Hawaii</option>
+<option value="ID">Idaho</option>
+<option value="IL">Illinois</option>
+<option value="IN">Indiana</option>
+<option value="IA">Iowa</option>
+<option value="KS">Kansas</option>
+<option value="KY">Kentucky</option>
+<option value="LA">Louisiana</option>
+<option value="ME">Maine</option>
+<option value="MD">Maryland</option>
+<option value="MA">Massachusetts</option>
+<option value="MI">Michigan</option>
+<option value="MN">Minnesota</option>
+<option value="MS">Mississippi</option>
+<option value="MO">Missouri</option>
+<option value="MT">Montana</option>
+<option value="NE">Nebraska</option>
+<option value="NV">Nevada</option>
+<option value="NH">New Hampshire</option>
+<option value="NJ">New Jersey</option>
+<option value="NM">New Mexico</option>
+<option value="NY">New York</option>
+<option value="NC">North Carolina</option>
+<option value="ND">North Dakota</option>
+<option value="MP">Northern Mariana Islands</option>
+<option value="OH">Ohio</option>
+<option value="OK">Oklahoma</option>
+<option value="OR">Oregon</option>
+<option value="PA">Pennsylvania</option>
+<option value="PR">Puerto Rico</option>
+<option value="RI">Rhode Island</option>
+<option value="SC">South Carolina</option>
+<option value="SD">South Dakota</option>
+<option value="TN">Tennessee</option>
+<option value="TX">Texas</option>
+<option value="UT">Utah</option>
+<option value="VT">Vermont</option>
+<option value="VI">Virgin Islands</option>
+<option value="VA">Virginia</option>
+<option value="WA">Washington</option>
+<option value="WV">West Virginia</option>
+<option value="WI">Wisconsin</option>
+<option value="WY">Wyoming</option>
+</select>
+            </div>
+        </div>
+        <div class="col-xl-5 col-md-6 col-sm-6">
+            <div class="form-group library-form_group">
+                <label class="library-form_label" for="District" id="candidate-district-label">District</label>
+                <input class="form-control library-form_control" data-val="true" data-val-required="The District field is required." id="District" name="District" type="text" value="" />
+            </div>
+        </div>
+    </div>
+    <div class="form-group library-form_group">
+        <button aria-label="search button" class="btn btn-library col-xs-12 col-sm-3" type="submit">Search</button>
+        <button aria-label="clear button" class="btn btn-library col-xs-12 col-sm-3 clearBtn" type="button">Clear</button>
+    </div>
+<input name="__RequestVerificationToken" type="hidden" value="CfDJ8FcoNu7-fJNHr-AhBT2v7PmfwcvmgY9Cv1g4fxH2DfjZ4rJf6C3omAX5fgTz_ujRDxNPcIHsGgmuCBiSGcH1AhcOC8s3LMP0-cU5uOUFfCL8CXWFjeWzdDOdxYoHxAKS0kR8gCLfxt_wmo7ls-hhhmo" /></form>
+            </div>
+        </div>
+    </div>
+    <br />
+    <br />
+    <div class="row">
+        <div id="search-result">
+        </div>
+    </div>
+</div>
+<script type="text/javascript" nonce="B2yPHKaXnvFWtRChIbabYmUBFZdVfKKXHbWtWidDVF8">
+    $(function () {
+        onFormSubmitted();
+    });
+</script>

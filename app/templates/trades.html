@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Stock Trades{% endblock %}
+{% block heading %}STOCK Act Disclosures{% endblock %}
+{% block subheading %}Congressional stock trades from House &amp; Senate periodic transaction reports{% endblock %}
+
+{% block content %}
+<div x-data="{
+  search: '{{ search or '' }}',
+  txn_type: '{{ txn_type or '' }}',
+  submit() {
+    const p = new URLSearchParams();
+    if (this.search) p.set('search', this.search);
+    if (this.txn_type) p.set('type', this.txn_type);
+    window.location.href = '/trades?' + p.toString();
+  }
+}">
+
+  <!-- Filters -->
+  <div class="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-4 mb-5 flex flex-wrap gap-3 items-end">
+    <div class="flex-1 min-w-48">
+      <label class="text-xs text-slate-500 font-medium block mb-1">Search member or ticker</label>
+      <input x-model="search" @keyup.enter="submit()" type="text" placeholder="e.g. Pelosi or NVDA"
+        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+    </div>
+    <div>
+      <label class="text-xs text-slate-500 font-medium block mb-1">Transaction type</label>
+      <select x-model="txn_type" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <option value="">All</option>
+        <option value="purchase">Purchase</option>
+        <option value="sale">Sale</option>
+        <option value="sale_partial">Sale (Partial)</option>
+      </select>
+    </div>
+    <button @click="submit()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+      Filter
+    </button>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="grid grid-cols-3 gap-4 mb-5">
+    {% set buys = trades | selectattr("transaction_type", "equalto", "purchase") | list %}
+    {% set sells = trades | selectattr("transaction_type", "in", ["sale", "sale_partial"]) | list %}
+    <a href="/trades?type=purchase" class="surface-link bg-white border border-slate-200 rounded-xl px-5 py-4 shadow-sm block">
+      <div class="text-2xl font-bold text-green-600">{{ buys | length }}</div>
+      <div class="text-xs text-slate-500 mt-0.5">Purchases</div>
+    </a>
+    <a href="/trades?type=sale" class="surface-link bg-white border border-slate-200 rounded-xl px-5 py-4 shadow-sm block">
+      <div class="text-2xl font-bold text-red-500">{{ sells | length }}</div>
+      <div class="text-xs text-slate-500 mt-0.5">Sales</div>
+    </a>
+    <a href="/trades" class="surface-link bg-white border border-slate-200 rounded-xl px-5 py-4 shadow-sm block">
+      <div class="text-2xl font-bold text-slate-700">{{ trades | length }}</div>
+      <div class="text-xs text-slate-500 mt-0.5">Total Transactions</div>
+    </a>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+    {% if trades %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-xs text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-200">
+            <th class="px-5 py-3 text-left font-semibold">Date</th>
+            <th class="px-5 py-3 text-left font-semibold">Member</th>
+            <th class="px-5 py-3 text-left font-semibold">Ticker</th>
+            <th class="px-5 py-3 text-left font-semibold">Asset</th>
+            <th class="px-5 py-3 text-left font-semibold">Type</th>
+            <th class="px-5 py-3 text-left font-semibold">Amount Range</th>
+            <th class="px-5 py-3 text-left font-semibold">Owner</th>
+            <th class="px-5 py-3 text-left font-semibold">Source</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-50">
+          {% for t in trades %}
+          <tr class="interactive-row hover:bg-slate-50 transition-colors" onclick="window.location='/members/{{ t.bioguide_id }}'">
+            <td class="px-5 py-2.5 text-slate-500 text-xs whitespace-nowrap">{{ t.transaction_date or "—" }}</td>
+            <td class="px-5 py-2.5">
+              <a href="/members/{{ t.bioguide_id }}" class="font-medium text-slate-900 hover:text-blue-600 text-xs">{{ t.full_name }}</a>
+              <div class="flex items-center gap-1 mt-0.5">
+                <span class="px-1.5 py-0.5 rounded text-xs badge-{{ t.party }}">{{ t.party }}</span>
+                <span class="text-xs text-slate-400">{{ t.state }}</span>
+              </div>
+            </td>
+            <td class="px-5 py-2.5 font-mono font-bold text-slate-900">{{ t.ticker or "—" }}</td>
+            <td class="px-5 py-2.5 text-xs text-slate-500 max-w-[220px]">
+              <details>
+                <summary class="cursor-pointer list-none hover:text-slate-700">
+                  {{ (t.asset_name or "—")[:42] }}{% if t.asset_name and t.asset_name|length > 42 %}…{% endif %}
+                </summary>
+                <div class="mt-1 text-xs text-slate-600 leading-relaxed">{{ t.asset_name or "—" }}</div>
+              </details>
+            </td>
+            <td class="px-5 py-2.5">
+              {% if t.transaction_type == "purchase" %}
+                <span class="text-green-600 font-semibold text-xs">↑ Purchase</span>
+              {% elif "sale" in (t.transaction_type or "") %}
+                <span class="text-red-500 font-semibold text-xs">↓ {{ "Sale (partial)" if t.transaction_type == "sale_partial" else "Sale" }}</span>
+              {% else %}
+                <span class="text-slate-500 text-xs">{{ t.transaction_type or "—" }}</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-2.5 text-xs text-slate-500">
+              {% if t.amount_min %}${{ "{:,.0f}".format(t.amount_min) }}{% endif %}
+              {% if t.amount_max %} – ${{ "{:,.0f}".format(t.amount_max) }}{% endif %}
+              {% if not t.amount_min and not t.amount_max %}—{% endif %}
+            </td>
+            <td class="px-5 py-2.5 text-xs text-slate-400 capitalize">{{ t.owner or "self" }}</td>
+            <td class="px-5 py-2.5">
+              <span class="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{{ t.source or "—" }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-5 py-3 border-t border-slate-100 text-xs text-slate-400">
+      Showing {{ trades | length }} trades · <a href="/api/trades" target="_blank" class="text-blue-500 hover:underline">JSON API</a>
+    </div>
+    {% else %}
+    <div class="py-20 text-center text-slate-400">
+      <div class="text-4xl mb-3">📊</div>
+      <div class="text-sm font-medium">No trades found</div>
+      <div class="text-xs mt-1">Run <code class="bg-slate-100 px-1.5 py-0.5 rounded">python scripts/ingest.py --source stocks</code></div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

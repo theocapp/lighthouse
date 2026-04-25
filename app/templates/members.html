@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Members{% endblock %}
+{% block heading %}Congress Members{% endblock %}
+{% block subheading %}{{ members | length }} members · sorted by conflict score{% endblock %}
+
+{% block content %}
+<div x-data="{
+  search: '{{ search or '' }}',
+  chamber: '{{ chamber or '' }}',
+  party: '{{ party or '' }}',
+  sort: '{{ sort or 'score' }}',
+  submit() {
+    const p = new URLSearchParams();
+    if (this.search) p.set('search', this.search);
+    if (this.chamber) p.set('chamber', this.chamber);
+    if (this.party) p.set('party', this.party);
+    if (this.sort) p.set('sort', this.sort);
+    window.location.href = '/members?' + p.toString();
+  }
+}">
+
+  <!-- Filters bar -->
+  <div class="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-4 mb-5 flex flex-wrap gap-3 items-end">
+    <div class="flex-1 min-w-48">
+      <label class="text-xs text-slate-500 font-medium block mb-1">Search name</label>
+      <input x-model="search" @keyup.enter="submit()" type="text" placeholder="e.g. Pelosi"
+        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+    </div>
+    <div>
+      <label class="text-xs text-slate-500 font-medium block mb-1">Chamber</label>
+      <select x-model="chamber" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <option value="">All</option>
+        <option value="house">House</option>
+        <option value="senate">Senate</option>
+      </select>
+    </div>
+    <div>
+      <label class="text-xs text-slate-500 font-medium block mb-1">Party</label>
+      <select x-model="party" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <option value="">All</option>
+        <option value="D">Democrat</option>
+        <option value="R">Republican</option>
+        <option value="I">Independent</option>
+      </select>
+    </div>
+    <div>
+      <label class="text-xs text-slate-500 font-medium block mb-1">Sort by</label>
+      <select x-model="sort" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <option value="score">Conflict score</option>
+        <option value="conflicts">Conflict count</option>
+        <option value="name">Name</option>
+      </select>
+    </div>
+    <button @click="submit()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+      Filter
+    </button>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+    {% if members %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-xs text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-200">
+            <th class="px-5 py-3 text-left font-semibold">Member</th>
+            <th class="px-5 py-3 text-left font-semibold">Party</th>
+            <th class="px-5 py-3 text-left font-semibold">Chamber</th>
+            <th class="px-5 py-3 text-left font-semibold">State</th>
+            <th class="px-5 py-3 text-right font-semibold">Conflicts</th>
+            <th class="px-5 py-3 text-right font-semibold">High ⚠</th>
+            <th class="px-5 py-3 text-right font-semibold">Max Score</th>
+            <th class="px-5 py-3 text-left font-semibold"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-50">
+          {% for m in members %}
+          <tr class="hover:bg-slate-50 transition-colors">
+            <td class="px-5 py-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <img
+                  src="{{ m.profile_image_url }}"
+                  alt="{{ m.full_name }}"
+                  class="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
+                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                >
+                <div
+                  class="w-10 h-10 rounded-full hidden items-center justify-center text-xs font-bold text-white shrink-0 {% if m.party == 'D' %}bg-blue-600{% elif m.party == 'R' %}bg-red-600{% else %}bg-slate-500{% endif %}">
+                  {{ m.full_name[:1] if m.full_name else '?' }}
+                </div>
+                <div class="min-w-0">
+                  <a href="/members/{{ m.bioguide_id }}" class="font-medium text-slate-900 hover:text-blue-600 truncate block">{{ m.full_name }}</a>
+                  <div class="text-xs text-slate-400 font-mono">{{ m.bioguide_id }}</div>
+                </div>
+              </div>
+            </td>
+            <td class="px-5 py-3">
+              <span class="px-2 py-0.5 rounded text-xs font-semibold badge-{{ m.party }}">{{ m.party }}</span>
+            </td>
+            <td class="px-5 py-3 text-slate-600 capitalize">{{ m.chamber }}</td>
+            <td class="px-5 py-3 text-slate-600">{{ m.state }}{% if m.district %}-{{ m.district }}{% endif %}</td>
+            <td class="px-5 py-3 text-right">
+              {% if m.conflict_count > 0 %}
+                <span class="font-semibold text-slate-700">{{ m.conflict_count }}</span>
+              {% else %}
+                <span class="text-slate-300">0</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-right">
+              {% if m.high_count > 0 %}
+                <span class="font-bold text-red-600">{{ m.high_count }}</span>
+              {% else %}
+                <span class="text-slate-300">—</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-right">
+              {% if m.max_score > 0 %}
+                <span class="inline-block px-2 py-0.5 rounded-full text-xs
+                  {% if m.max_score >= 70 %}conf-high{% elif m.max_score >= 40 %}conf-medium{% else %}conf-low{% endif %}">
+                  {{ m.max_score }}
+                </span>
+              {% else %}
+                <span class="text-slate-300 text-xs">—</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3">
+              <a href="/members/{{ m.bioguide_id }}" class="text-xs text-blue-500 hover:underline whitespace-nowrap">View report →</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="py-20 text-center text-slate-400">
+      <div class="text-4xl mb-3">🔍</div>
+      <div class="text-sm font-medium">No members found</div>
+      <div class="text-xs mt-1">Try adjusting your filters or run ingestion first.</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

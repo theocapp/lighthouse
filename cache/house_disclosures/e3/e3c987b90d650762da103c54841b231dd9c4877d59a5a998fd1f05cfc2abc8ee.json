@@ -1,0 +1,67 @@
+<div class="dataTables_wrapper no-footer library-table_wrapper">
+    <h2>
+        Search Results
+    </h2>
+    <table data-paging="true" data-ordering="true" data-order='[[ 0, "asc" ], [ 2, "asc" ]]' class="library-table table dataTable no-footer table-striped"
+           role="grid" aria-describedby="Financial Disclosure Search Results">
+        <caption class="sr-only">Financial Disclosures</caption>
+        <thead>
+            <tr role="row">
+                <th scope="col">Name</th>
+                <th scope="col">Office</th>
+                <th scope="col">Filing Year</th>
+                <th scope="col">Filing</th>
+            </tr>
+        </thead>
+        <tbody>
+                    <tr role="row">
+                        <td data-label="Name" class="memberName">
+                            <a href="public_disc/financial-pdfs/2024/10066169.pdf" target="_blank">Pelosi, Hon.. Nancy </a>
+                        </td>
+                        <td data-label="Office">CA11</td>
+                        <td data-label="Filing Year">2024</td>
+                        <td data-label="Filing">FD Original</td>
+                    </tr>
+                    <tr role="row">
+                        <td data-label="Name" class="memberName">
+                            <a href="public_disc/ptr-pdfs/2024/20024542.pdf" target="_blank">Pelosi, Hon.. Nancy </a>
+                        </td>
+                        <td data-label="Office">CA11</td>
+                        <td data-label="Filing Year">2024</td>
+                        <td data-label="Filing">PTR Original</td>
+                    </tr>
+                    <tr role="row">
+                        <td data-label="Name" class="memberName">
+                            <a href="public_disc/ptr-pdfs/2024/20024625.pdf" target="_blank">Pelosi, Hon.. Nancy </a>
+                        </td>
+                        <td data-label="Office">CA11</td>
+                        <td data-label="Filing Year">2024</td>
+                        <td data-label="Filing">PTR Original</td>
+                    </tr>
+                    <tr role="row">
+                        <td data-label="Name" class="memberName">
+                            <a href="public_disc/ptr-pdfs/2024/20025368.pdf" target="_blank">Pelosi, Hon.. Nancy </a>
+                        </td>
+                        <td data-label="Office">CA11</td>
+                        <td data-label="Filing Year">2024</td>
+                        <td data-label="Filing">PTR Original</td>
+                    </tr>
+                    <tr role="row">
+                        <td data-label="Name" class="memberName">
+                            <a href="public_disc/ptr-pdfs/2024/20025535.pdf" target="_blank">Pelosi, Hon.. Nancy </a>
+                        </td>
+                        <td data-label="Office">CA11</td>
+                        <td data-label="Filing Year">2024</td>
+                        <td data-label="Filing">PTR Original</td>
+                    </tr>
+                    <tr role="row">
+                        <td data-label="Name" class="memberName">
+                            <a href="public_disc/ptr-pdfs/2024/20025819.pdf" target="_blank">Pelosi, Hon.. Nancy </a>
+                        </td>
+                        <td data-label="Office">CA11</td>
+                        <td data-label="Filing Year">2024</td>
+                        <td data-label="Filing">PTR Original</td>
+                    </tr>
+        </tbody>
+    </table>
+</div>

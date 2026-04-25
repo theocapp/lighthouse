@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Lighthouse{% endblock %} — Congressional COI Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .nav-link { @apply inline-flex items-center gap-2 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-sm font-medium; }
+    .nav-link.active { @apply bg-emerald-600 text-white; }
+    .surface-link { @apply block transition-all hover:shadow-md hover:-translate-y-0.5; }
+    .interactive-row { @apply cursor-pointer; }
+    .badge-D { @apply bg-blue-100 text-blue-800; }
+    .badge-R { @apply bg-red-100 text-red-800; }
+    .badge-I { @apply bg-slate-100 text-slate-700; }
+    .conf-high { @apply bg-red-100 text-red-700 font-semibold; }
+    .conf-medium { @apply bg-amber-100 text-amber-700 font-semibold; }
+    .conf-low { @apply bg-green-100 text-green-700 font-semibold; }
+  </style>
+</head>
+<body class="h-full bg-slate-50 text-slate-900">
+
+  <header class="sticky top-0 z-40 bg-slate-950/95 backdrop-blur border-b border-slate-800 text-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-6 lg:px-8 py-3">
+      <div class="flex items-center justify-between gap-4 flex-wrap">
+        <a href="/" class="flex items-center gap-3 group">
+          <svg width="38" height="38" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="15" y="6" width="18" height="34" rx="9" fill="#10B981"/>
+            <path d="M24 6C28.9706 6 33 10.0294 33 15V40H15V15C15 10.0294 19.0294 6 24 6Z" fill="#D1FAE5"/>
+            <path d="M18 13H30" stroke="#064E3B" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M18 20H30" stroke="#064E3B" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M18 27H30" stroke="#064E3B" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M24 40V44" stroke="#D1FAE5" stroke-width="3" stroke-linecap="round"/>
+            <path d="M10 15C10 15 14 11 18 11" stroke="#D1FAE5" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M38 15C38 15 34 11 30 11" stroke="#D1FAE5" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+          <div>
+            <div class="font-bold text-lg leading-none">Lighthouse</div>
+            <div class="text-emerald-200/80 text-xs mt-0.5">Congressional COI Tracker</div>
+          </div>
+        </a>
+
+        <nav class="flex items-center gap-1 sm:gap-2 flex-wrap">
+          <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+            Dashboard
+          </a>
+          <a href="/members" class="nav-link {% if active_page == 'members' %}active{% endif %}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Members
+          </a>
+          <a href="/conflicts" class="nav-link {% if active_page == 'conflicts' %}active{% endif %}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            Conflicts
+          </a>
+          <a href="/trades" class="nav-link {% if active_page == 'trades' %}active{% endif %}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+            Stock Trades
+          </a>
+          <a href="/api/stats" target="_blank" class="nav-link">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            JSON API
+          </a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex min-h-[calc(100vh-72px)] flex-col overflow-x-hidden">
+    <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto w-full">
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="px-4 sm:px-6 lg:px-8 py-4 border-t border-slate-200 text-xs text-slate-400 text-center">
+      Lighthouse — Built for public transparency using government data. Not legal findings.
+    </footer>
+  </div>
+
+</body>
+</html>
