@@ -26,6 +26,9 @@ _COMPANY_ALIASES: list[tuple[str, str, str, str]] = [
     (r"\berkshire hathaway\b", "BRK.B", "financials", "high"),
     (r"\bmorgan stanley\b", "MS", "financials", "high"),
     (r"\bgoldman sachs\b", "GS", "financials", "high"),
+    (r"\bblackrock(?:,?\s+inc\.?|\s+incorporated)\b", "BLK", "financials", "medium"),
+    (r"\bprudential financial\b", "PRU", "financials", "high"),
+    (r"\bprincipal financial(?: group)?\b", "PFG", "financials", "high"),
     (r"\bjohnson and johnson\b|\bjohnson & johnson\b|\bj&j\b", "JNJ", "health_care", "high"),
     (r"\bpfizer\b", "PFE", "health_care", "high"),
     (r"\beli lilly\b", "LLY", "health_care", "high"),
@@ -52,7 +55,19 @@ _COMPANY_ALIASES: list[tuple[str, str, str, str]] = [
 ]
 
 
-_DIVERSIFIED_SIGNALS = [
+_DIVERSIFIED_FUND_PATTERNS = [
+    r"\bs&p 500\b",
+    r"\btotal (?:stock )?market\b",
+    r"\bindex fund\b",
+    r"\bexchange[ -]traded fund\b",
+    r"\betf\b",
+    r"\bmutual fund\b",
+    r"\btarget[ -]date\b",
+    r"\bbond fund\b",
+    r"\btreasury fund\b",
+]
+
+_DIVERSIFIED_PROVIDER_PATTERNS = [
     "vanguard",
     "fidelity",
     "blackrock",
@@ -80,40 +95,57 @@ _DIVERSIFIED_SIGNALS = [
     "state street",
 ]
 
-_TREASURY_PATTERNS = [r"\btreasury\b", r"\bbill\b", r"\bnote\b", r"\bbond\b"]
-_MUNICIPAL_BOND_PATTERNS = [r"\bmunicipal\b", r"\bmuni\b"]
-_CORPORATE_BOND_PATTERNS = [r"corporate bond", r"corp bond", r"corporate note"]
+_DIVERSIFIED_PROVIDER_CONTEXT_PATTERNS = [
+    *_DIVERSIFIED_FUND_PATTERNS,
+    r"\bfund\b",
+    r"\bindex\b",
+    r"\bretirement\b",
+    r"\b401\s*\(?k\)?\b",
+    r"\b403\s*\(?b\)?\b",
+    r"\bira\b",
+]
+
+_TREASURY_CONTEXT_PATTERNS = [
+    r"\btreasury\b",
+    r"\bu\.?s\.?\s+(?:government\s+)?(?:treasury\s+)?(?:bill|note|bond|security|securities)\b",
+    r"\bunited states\s+(?:government\s+)?(?:treasury\s+)?(?:bill|note|bond|security|securities)\b",
+    r"\bt[- ]?(?:bill|note|bond)s?\b",
+]
+_MUNICIPAL_BOND_PATTERNS = [r"\bmunicipal bond\b", r"\bmuni(?:cipal)? bond\b"]
+_CORPORATE_BOND_PATTERNS = [r"\bcorporate bond\b", r"\bcorp(?:orate)? bond\b", r"\bcorporate note\b"]
 _CASH_PATTERNS = [
-    r"money market",
-    r"savings account",
-    r"checking account",
-    r"deposit account",
-    r"certificate of deposit",
-    r"\bcd\b",
-    r"brokerage sweep",
-    r"cash account",
-    r"cash",
+    r"\bmoney market\b",
+    r"\bsavings account\b",
+    r"\bchecking account\b",
+    r"\bdeposit account\b",
+    r"\bcertificate of deposit\b",
+    r"^cd$",
+    r"\bbrokerage sweep\b",
+    r"\bcash account\b",
+    r"\bcash (?:and equivalents?|balance|holding|reserve|management)\b",
+    r"^cash$",
 ]
 _REAL_ESTATE_PATTERNS = [
-    r"real estate",
-    r"rental property",
-    r"land",
-    r"farm",
-    r"apartment",
-    r"condo",
-    r"residential",
-    r"commercial property",
-    r"reit",
+    r"\breal estate\b",
+    r"\brental property\b",
+    r"\b(?:vacant|undeveloped|farm|timber|agricultural)\s+land\b",
+    r"\bland parcel\b",
+    r"\bfarm(?:land)?\b",
+    r"\bapartment\b",
+    r"\bcondo(?:minium)?\b",
+    r"\bresidential property\b",
+    r"\bcommercial property\b",
+    r"\breit\b",
 ]
-_TRUST_PATTERNS = [r"family trust", r"revocable trust", r"living trust", r"\btrust\b"]
+_TRUST_PATTERNS = [r"\bfamily trust\b", r"\brevocable trust\b", r"\bliving trust\b", r"\btrust account\b"]
 _PRIVATE_BUSINESS_PATTERNS = [
     r"\bllc\b",
     r"\bl\.l\.c\.\b",
-    r"\blp\b",
-    r"limited partnership",
+    r"\bl\.?p\.?\b",
+    r"\blimited partnership\b",
     r"\bpartnership\b",
-    r"private company",
-    r"closely held",
+    r"\bprivate company\b",
+    r"\bclosely held\b",
 ]
 
 
@@ -147,20 +179,9 @@ def classify_asset_record(asset: dict[str, Any]) -> dict[str, Any]:
             return _merge_classification(asset, classification)
 
     if not ticker and asset_name:
-        diversified_match = _match_any(asset_name, _DIVERSIFIED_SIGNALS)
+        diversified_match = _match_diversified_fund(asset_name)
         if diversified_match:
-            high_confidence_terms = {
-                "s&p 500",
-                "total market",
-                "index fund",
-                "exchange traded fund",
-                "etf",
-                "mutual fund",
-                "target date",
-                "bond fund",
-                "treasury fund",
-            }
-            high_confidence_match = _match_any(asset_name, list(high_confidence_terms))
+            high_confidence_match = _match_any(asset_name, _DIVERSIFIED_FUND_PATTERNS)
             classification.update({
                 "sector": "diversified",
                 "asset_class": "diversified_fund",
@@ -236,6 +257,18 @@ def _match_company_alias(asset_name: str) -> Optional[tuple[str, str, str]]:
     return None
 
 
+def _match_diversified_fund(asset_name: str) -> Optional[str]:
+    fund_match = _match_any(asset_name, _DIVERSIFIED_FUND_PATTERNS)
+    if fund_match:
+        return fund_match
+
+    provider_match = _match_any(asset_name, _DIVERSIFIED_PROVIDER_PATTERNS)
+    if provider_match and _match_any(asset_name, _DIVERSIFIED_PROVIDER_CONTEXT_PATTERNS):
+        return provider_match
+
+    return None
+
+
 def _match_fixed_income(asset_name: str) -> Optional[tuple[str, str, str, str]]:
     lower = asset_name.lower()
 
@@ -247,8 +280,8 @@ def _match_fixed_income(asset_name: str) -> Optional[tuple[str, str, str, str]]:
     if corporate:
         return "corporate_bond", "fixed_income", f"Corporate bond signal matched: {corporate}.", "high"
 
-    treasury = _match_any(lower, _TREASURY_PATTERNS)
-    if treasury and any(token in lower for token in ("treasury", "bill", "note", "bond")):
+    treasury = _match_any(lower, _TREASURY_CONTEXT_PATTERNS)
+    if treasury:
         return "treasury", "fixed_income", f"Treasury signal matched: {treasury}.", "high"
 
     cash = _match_any(lower, _CASH_PATTERNS)

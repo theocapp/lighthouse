@@ -51,6 +51,7 @@ def test_tickerless_company_name_maps_to_known_sector_and_ticker():
 def test_diversified_funds_and_fixed_income_assets_classify_conservatively():
     vanguard = classify_asset_record({"asset_name": "Vanguard Total Stock Market Index Fund", "ticker": None, "asset_type": "unknown", "sector": None})
     ishares = classify_asset_record({"asset_name": "iShares S&P 500 ETF", "ticker": None, "asset_type": "unknown", "sector": None})
+    treasury = classify_asset_record({"asset_name": "U.S. Treasury Bill", "ticker": None, "asset_type": "unknown", "sector": None})
     muni = classify_asset_record({"asset_name": "City of Austin Municipal Bond", "ticker": None, "asset_type": "unknown", "sector": None})
 
     assert vanguard["asset_class"] == "diversified_fund"
@@ -61,8 +62,80 @@ def test_diversified_funds_and_fixed_income_assets_classify_conservatively():
     assert ishares["sector"] == "diversified"
     assert ishares["classification_confidence"] == "high"
 
+    assert treasury["asset_class"] == "treasury"
+    assert treasury["sector"] == "fixed_income"
+
     assert muni["asset_class"] == "municipal_bond"
     assert muni["sector"] == "fixed_income"
+
+
+def test_provider_names_are_not_diversified_without_fund_or_retirement_context():
+    provider_names = [
+        "Prudential",
+        "Principal Committee",
+        "Principal",
+        "BlackRock",
+        "Fidelity National Information Services",
+        "State Street Corporation",
+    ]
+
+    for asset_name in provider_names:
+        classified = classify_asset_record({"asset_name": asset_name, "ticker": None, "asset_type": "unknown", "sector": None})
+        assert classified["asset_class"] == "unknown", asset_name
+        assert classified["sector"] == "unknown", asset_name
+        assert classified["is_diversified"] is False
+
+    prudential_fund = classify_asset_record({"asset_name": "Prudential Retirement Fund", "ticker": None, "asset_type": "unknown", "sector": None})
+    blackrock_etf = classify_asset_record({"asset_name": "BlackRock S&P 500 ETF", "ticker": None, "asset_type": "unknown", "sector": None})
+
+    assert prudential_fund["asset_class"] == "diversified_fund"
+    assert blackrock_etf["asset_class"] == "diversified_fund"
+
+
+def test_bills_notes_and_generic_bonds_need_fixed_income_context():
+    false_positive_names = [
+        "Promissory Note Receivable",
+        "Bill.com Holdings",
+        "Utility bill reimbursement",
+        "Bond Street Holdings",
+    ]
+
+    for asset_name in false_positive_names:
+        classified = classify_asset_record({"asset_name": asset_name, "ticker": None, "asset_type": "unknown", "sector": None})
+        assert classified["asset_class"] == "unknown", asset_name
+        assert classified["sector"] == "unknown", asset_name
+
+    treasury_note = classify_asset_record({"asset_name": "United States Treasury Note", "ticker": None, "asset_type": "unknown", "sector": None})
+    treasury_bill = classify_asset_record({"asset_name": "U.S. Treasury Bill", "ticker": None, "asset_type": "unknown", "sector": None})
+    muni = classify_asset_record({"asset_name": "municipal bond", "ticker": None, "asset_type": "unknown", "sector": None})
+
+    assert treasury_note["asset_class"] == "treasury"
+    assert treasury_bill["asset_class"] == "treasury"
+    assert muni["asset_class"] == "municipal_bond"
+
+
+def test_generic_trust_land_and_cash_words_stay_unknown_without_asset_context():
+    false_positive_names = [
+        "Trustmark Corporation",
+        "Trust Services Invoice",
+        "Landmark Partners",
+        "Land Rover Group",
+        "Cash App",
+        "CD Projekt",
+    ]
+
+    for asset_name in false_positive_names:
+        classified = classify_asset_record({"asset_name": asset_name, "ticker": None, "asset_type": "unknown", "sector": None})
+        assert classified["asset_class"] == "unknown", asset_name
+        assert classified["sector"] == "unknown", asset_name
+
+    family_trust = classify_asset_record({"asset_name": "Smith Family Trust", "ticker": None, "asset_type": "unknown", "sector": None})
+    rental_property = classify_asset_record({"asset_name": "rental property", "ticker": None, "asset_type": "unknown", "sector": None})
+    cash_account = classify_asset_record({"asset_name": "cash account", "ticker": None, "asset_type": "unknown", "sector": None})
+
+    assert family_trust["asset_class"] == "trust"
+    assert rental_property["asset_class"] == "real_estate"
+    assert cash_account["asset_class"] == "cash_or_deposit"
 
 
 def test_real_estate_private_business_and_unknown_assets_stay_conservative():
