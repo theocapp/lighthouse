@@ -27,6 +27,7 @@ def build_report(session: Session, bioguide_id: str) -> Optional[dict]:
     cosponsor_rows = q.get_cosponsored_bills(session, bioguide_id)
     vote_stats = q.get_member_vote_stats(session, bioguide_id)
     recent_votes = q.get_member_recent_votes(session, bioguide_id, limit=25)
+    data_coverage = q.get_data_coverage(session)
 
     high = [c for c in conflicts if c["confidence"] == "high"]
     medium = [c for c in conflicts if c["confidence"] == "medium"]
@@ -108,6 +109,7 @@ def build_report(session: Session, bioguide_id: str) -> Optional[dict]:
         },
         "summary": {
             "total_conflicts": len(conflicts),
+            "total_signals": len(conflicts),
             "high_confidence": len(high),
             "medium_confidence": len(medium),
             "low_confidence": len(low),
@@ -119,9 +121,14 @@ def build_report(session: Session, bioguide_id: str) -> Optional[dict]:
             "total_contribution_amount": funding_summary["total_amount"],
             "committees": [c["committee_name"] for c in committees],
             "committee_roles": committees,
+            "disclaimer": (
+                "Lighthouse does not prove corruption, illegality, intent, or misconduct. "
+                "It identifies evidence-backed signals that may deserve review."
+            ),
         },
         "coverage": {
             "has_conflicts": bool(conflicts),
+            "has_signals": bool(conflicts),
             "has_assets": bool(assets),
             "has_transactions": bool(transactions),
             "has_committees": bool(committees),
@@ -131,6 +138,7 @@ def build_report(session: Session, bioguide_id: str) -> Optional[dict]:
             "latest_trade_date": latest_trade_date,
             "latest_vote_date": latest_vote_date,
             "latest_contribution_date": funding_summary["latest_date"],
+            "data_coverage": data_coverage,
         },
         "portfolio": {
             "total_value_min": int(total_value_min),
@@ -155,6 +163,10 @@ def build_report(session: Session, bioguide_id: str) -> Optional[dict]:
             "sponsored_count": len(sponsored_bills),
             "cosponsored_count": len(cosponsor_rows),
         },
+        "disclaimer": (
+            "Lighthouse does not prove corruption, illegality, intent, or misconduct. "
+            "It surfaces public-data signals that may deserve review."
+        ),
         "conflicts": conflicts,
         "conflicts_by_type": by_type,
         "assets": assets,

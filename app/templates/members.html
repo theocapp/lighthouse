@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Members{% endblock %}
 {% block heading %}Congress Members{% endblock %}
-{% block subheading %}{{ members | length }} members · sorted by conflict score{% endblock %}
+{% block subheading %}{{ members | length }} members · sorted by signal score{% endblock %}
 
 {% block content %}
 <div x-data="{
@@ -46,8 +46,8 @@
     <div>
       <label class="text-xs text-slate-500 font-medium block mb-1">Sort by</label>
       <select x-model="sort" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-        <option value="score">Conflict score</option>
-        <option value="conflicts">Conflict count</option>
+        <option value="score">Signal score</option>
+        <option value="conflicts">Signal count</option>
         <option value="name">Name</option>
       </select>
     </div>
@@ -67,7 +67,7 @@
             <th class="px-5 py-3 text-left font-semibold">Party</th>
             <th class="px-5 py-3 text-left font-semibold">Chamber</th>
             <th class="px-5 py-3 text-left font-semibold">State</th>
-            <th class="px-5 py-3 text-right font-semibold">Conflicts</th>
+            <th class="px-5 py-3 text-right font-semibold">Signals</th>
             <th class="px-5 py-3 text-right font-semibold">High ⚠</th>
             <th class="px-5 py-3 text-right font-semibold">Max Score</th>
             <th class="px-5 py-3 text-left font-semibold"></th>

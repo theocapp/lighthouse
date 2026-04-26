@@ -2,9 +2,14 @@
 Aggregates raw conflict candidates into scored, deduplicated Conflict records.
 """
 import json
-from dataclasses import dataclass
 from typing import Optional
 
+from .evidence import (
+    build_evidence_context,
+    classify_evidence_tier,
+    confidence_from_evidence_tier,
+    signal_strength_from_score,
+)
 from .rules.vote_holding import ConflictCandidate
 
 RULE_WEIGHTS: dict[str, float] = {
@@ -15,14 +20,6 @@ RULE_WEIGHTS: dict[str, float] = {
     "committee_donor": 0.65,
     "family_holding": 0.75,
 }
-
-
-def _confidence(score: float) -> str:
-    if score >= 53:
-        return "high"
-    if score >= 35:
-        return "medium"
-    return "low"
 
 
 def _dedup_key(c: ConflictCandidate) -> tuple:
@@ -58,18 +55,42 @@ def score_candidates(
     for c in seen.values():
         weight = weights.get(c.conflict_type, 1.0)
         final_score = min(c.raw_score * weight, 100.0)
+        evidence_tier = classify_evidence_tier(c.evidence, conflict_type=c.conflict_type)
+        confidence = confidence_from_evidence_tier(
+            evidence_tier,
+            c.evidence.get("source_quality"),
+            has_exact_match=bool(
+                c.evidence.get("exact_company_match") or c.evidence.get("exact_ticker_match")
+            ),
+        )
+        detail = build_evidence_context(
+            c.evidence,
+            conflict_type=c.conflict_type,
+            score=final_score,
+            confidence=confidence,
+        )
+        detail.update(
+            {
+                "bill_id": c.bill_id,
+                "vote_id": c.vote_id,
+                "asset_id": c.asset_id,
+                "transaction_id": c.transaction_id,
+                "contribution_id": c.contribution_id,
+            }
+        )
 
         results.append({
             "conflict_type": c.conflict_type,
             "score": round(final_score, 2),
-            "confidence": _confidence(final_score),
+            "confidence": confidence,
             "vote_id": c.vote_id,
             "bill_id": c.bill_id,
             "asset_id": c.asset_id,
             "transaction_id": c.transaction_id,
             "contribution_id": c.contribution_id,
             "evidence_summary": _summarize(c),
-            "detail_json": json.dumps(c.evidence),
+            "signal_strength": signal_strength_from_score(final_score),
+            "detail_json": json.dumps(detail),
         })
 
     results.sort(key=lambda x: x["score"], reverse=True)
@@ -80,32 +101,33 @@ def _summarize(c: ConflictCandidate) -> str:
     ev = c.evidence
     if c.conflict_type == "vote_holding":
         return (
-            f"Voted {ev.get('position')} on bill in {ev.get('sector')} sector "
+            f"Potential vote-holding signal: voted {ev.get('position')} on a {ev.get('sector')} policy matter "
             f"while holding {ev.get('asset_name')} (max ${ev.get('value_max'):,.0f})"
             if ev.get("value_max") else
-            f"Voted {ev.get('position')} on bill in {ev.get('sector')} sector "
+            f"Potential vote-holding signal: voted {ev.get('position')} on a {ev.get('sector')} policy matter "
             f"while holding {ev.get('asset_name')}"
         )
     if c.conflict_type in ("trade_timing_pre", "trade_timing_post"):
         direction = "before" if "pre" in c.conflict_type else "after"
         return (
-            f"Traded {ev.get('ticker')} {ev.get('transaction_type')} "
-            f"{abs(ev.get('gap_days', 0))} days {direction} vote on related bill"
+            f"Potential trade-timing signal: traded {ev.get('ticker')} {ev.get('transaction_type')} "
+            f"{abs(ev.get('gap_days', 0))} days {direction} a related vote"
         )
     if c.conflict_type == "sponsorship_holding":
         return (
-            f"{'Sponsored' if ev.get('role') == 'sponsor' else 'Cosponsored'} bill "
-            f"in {ev.get('sector')} sector while holding {ev.get('asset_name')}"
+            f"Potential sponsorship-holding signal: "
+            f"{'sponsored' if ev.get('role') == 'sponsor' else 'cosponsored'} a {ev.get('sector')} bill "
+            f"while holding {ev.get('asset_name')}"
         )
     if c.conflict_type == "committee_donor":
         return (
-            f"Received {ev.get('contribution_type', 'contribution')} of "
+            f"Potential committee-donor signal: received {ev.get('contribution_type', 'contribution')} of "
             f"${ev.get('amount', 0):,.2f} from {ev.get('contributor_industry')} "
-            f"— regulates via {', '.join(ev.get('committees', []))}"
+            f"while serving on {', '.join(ev.get('committees', []))}"
         )
     if c.conflict_type == "family_holding":
         return (
-            f"{ev.get('owner', 'family').title()} holds {ev.get('asset_name')} "
-            f"in {ev.get('sector')} sector affected by vote"
+            f"Potential family-holding signal: {ev.get('owner', 'family').title()} holds {ev.get('asset_name')} "
+            f"in a sector touched by the vote"
         )
     return c.conflict_type

@@ -1,6 +1,6 @@
 """
 Rule: Member voted on a bill whose industry sector overlaps with their held stock.
-This is the most direct and legally significant conflict pattern.
+This is one of the strongest public-data signal patterns, but not proof of wrongdoing.
 """
 import json
 from dataclasses import dataclass, field
@@ -63,6 +63,9 @@ def detect(member_votes: list[dict], assets: list[dict], bills: dict) -> list[Co
         policy_area = bill.get("policy_area") or ""
         subjects = json.loads(bill.get("subjects_json") or "[]")
         sectors = bill_sectors(policy_area, subjects)
+        bill_text = " ".join(
+            part for part in [bill.get("title"), bill.get("short_title")] if part
+        ).lower()
 
         if not sectors:
             continue
@@ -85,6 +88,16 @@ def detect(member_votes: list[dict], assets: list[dict], bills: dict) -> list[Co
                     bill=bill,
                     sector=sector,
                 )
+                exact_ticker_match = bool(
+                    asset.get("ticker") and asset.get("ticker", "").lower() in bill_text
+                )
+                exact_company_match = _asset_name_matches_bill(asset.get("asset_name"), bill_text)
+                narrow_industry_match = not (exact_ticker_match or exact_company_match) and _is_narrow_industry_match(
+                    bill_text,
+                    policy_area,
+                    subjects,
+                    sector,
+                )
 
                 results.append(ConflictCandidate(
                     conflict_type="vote_holding",
@@ -100,6 +113,17 @@ def detect(member_votes: list[dict], assets: list[dict], bills: dict) -> list[Co
                         "ticker": asset.get("ticker"),
                         "value_max": asset.get("value_max"),
                         "owner": asset.get("owner"),
+                        "bill_title": bill.get("short_title") or bill.get("title"),
+                        "exact_ticker_match": exact_ticker_match,
+                        "exact_company_match": exact_company_match,
+                        "narrow_industry_match": narrow_industry_match,
+                        "sector_match": True,
+                        "source_quality": "public_disclosure_with_bill_and_vote_records",
+                        "bill_source_url": bill.get("govinfo_url"),
+                        "vote_source_url": vote_rec.get("vote_source_url"),
+                        "asset_source_url": asset.get("disclosure_source_url"),
+                        "asset_parser_source": asset.get("disclosure_source"),
+                        "disclosure_id": asset.get("disclosure_id"),
                     },
                 ))
 
@@ -109,41 +133,79 @@ def detect(member_votes: list[dict], assets: list[dict], bills: dict) -> list[Co
 def _compute_score(voted_yes: bool, asset: dict, bill: dict, sector: str) -> float:
     val = float(asset.get("value_max") or 0)
 
-    # Vote direction: voted in favor of a bill = stronger conflict signal
-    vote_score = 50.0 if voted_yes else 15.0
+    # Voting in favor raises signal strength, but broad overlaps should stay conservative.
+    vote_score = 26.0 if voted_yes else 10.0
 
-    # Holding size on a continuous scale (0–50 points)
+    # Holding size on a continuous scale.
     if val >= 5_000_000:
-        size_score = 50.0
-    elif val >= 1_000_000:
-        size_score = 40.0
-    elif val >= 500_000:
         size_score = 30.0
+    elif val >= 1_000_000:
+        size_score = 24.0
+    elif val >= 500_000:
+        size_score = 18.0
     elif val >= 250_000:
-        size_score = 22.0
+        size_score = 13.0
     elif val >= 100_000:
-        size_score = 15.0
+        size_score = 9.0
     elif val >= 50_000:
-        size_score = 8.0
+        size_score = 5.0
     elif val >= 15_000:
-        size_score = 4.0
+        size_score = 3.0
     else:
         size_score = 1.0
 
     score = vote_score + size_score
 
-    # Direct ticker match (bill explicitly affects a specific company)
+    # Company/ticker matches justify stronger scores than sector overlap alone.
     ticker = asset.get("ticker")
     title = (bill.get("title") or "").lower()
     short = (bill.get("short_title") or "").lower()
     if ticker and (ticker.lower() in title or ticker.lower() in short):
-        score += 10.0
+        score += 28.0
+    elif _asset_name_matches_bill(asset.get("asset_name"), f"{title} {short}"):
+        score += 24.0
+    elif _is_narrow_industry_match(f"{title} {short}", bill.get("policy_area") or "", json.loads(bill.get("subjects_json") or "[]"), sector):
+        score += 12.0
 
     # Discount for family holdings
     owner = asset.get("owner", "self")
     if owner == "spouse":
-        score *= 0.6
+        score *= 0.55
     elif owner == "dependent":
         score *= 0.4
+    elif owner == "joint":
+        score *= 0.75
 
     return min(score, 100.0)
+
+
+def _asset_name_matches_bill(asset_name: Optional[str], bill_text: str) -> bool:
+    if not asset_name:
+        return False
+    cleaned = " ".join(part for part in asset_name.lower().replace(",", " ").split() if len(part) > 2)
+    if not cleaned:
+        return False
+    variants = [cleaned]
+    if " inc" in cleaned:
+        variants.append(cleaned.replace(" inc", ""))
+    if " corp" in cleaned:
+        variants.append(cleaned.replace(" corp", ""))
+    return any(variant and variant in bill_text for variant in variants)
+
+
+def _is_narrow_industry_match(
+    bill_text: str,
+    policy_area: str,
+    subjects: list[str],
+    sector: str,
+) -> bool:
+    narrow_keywords = {
+        "energy": ["pipeline", "drilling", "refinery", "petroleum", "liquefied natural gas"],
+        "financials": ["hedge fund", "credit union", "mortgage servicer", "private equity", "securities"],
+        "health_care": ["pharmaceutical", "biotech", "drug", "hospital", "medical device"],
+        "information_technology": ["semiconductor", "cybersecurity", "software", "artificial intelligence"],
+        "communication_services": ["telecommunications", "broadband", "broadcast", "social media"],
+        "defense": ["defense contractor", "weapon", "aerospace", "military"],
+    }
+    text = " ".join([bill_text, policy_area.lower(), " ".join(s.lower() for s in subjects)])
+    return any(keyword in text for keyword in narrow_keywords.get(sector, []))

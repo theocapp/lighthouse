@@ -18,6 +18,11 @@ def stats(session: Session = Depends(get_session)):
     return q.get_dashboard_stats(session)
 
 
+@router.get("/coverage")
+def coverage(session: Session = Depends(get_session)):
+    return q.get_data_coverage(session)
+
+
 @router.get("/members")
 def members(
     chamber: Optional[str] = None,

@@ -37,7 +37,7 @@ class BaseCollector:
     - Disk-based response caching keyed by URL + params
     """
 
-    USER_AGENT = "Lighthouse/0.1 (Congressional COI Tracker; contact@lighthouse.dev)"
+    USER_AGENT = "Lighthouse/0.1 (Congressional Ethics Signal Explorer; contact@lighthouse.dev)"
 
     def __init__(self, rate: float, cache_dir: Path, cache_ttl_days: int = 1):
         self.rate_limiter = RateLimiter(rate)

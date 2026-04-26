@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Conflicts Explorer{% endblock %}
-{% block heading %}Conflicts Explorer{% endblock %}
-{% block subheading %}{{ conflicts | length }} conflicts detected across all members{% endblock %}
+{% block title %}Signals Explorer{% endblock %}
+{% block heading %}Signals Explorer{% endblock %}
+{% block subheading %}{{ conflicts | length }} potential ethics signals across tracked members{% endblock %}
 
 {% block content %}
 <div x-data="{
@@ -39,12 +39,12 @@
       <label class="text-xs text-slate-500 font-medium block mb-1">Type</label>
       <select x-model="conflict_type" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
         <option value="">All types</option>
-        <option value="vote_holding">Vote + Holding</option>
-        <option value="trade_timing_pre">Trade Before Vote</option>
-        <option value="trade_timing_post">Trade After Vote</option>
-        <option value="sponsorship_holding">Sponsorship + Holding</option>
-        <option value="committee_donor">Committee Donor</option>
-        <option value="family_holding">Family Holding</option>
+        <option value="vote_holding">Vote + Holding Signal</option>
+        <option value="trade_timing_pre">Trade Before Vote Signal</option>
+        <option value="trade_timing_post">Trade After Vote Signal</option>
+        <option value="sponsorship_holding">Sponsorship + Holding Signal</option>
+        <option value="committee_donor">Committee + Donor Signal</option>
+        <option value="family_holding">Family Holding Signal</option>
       </select>
     </div>
     <div>
@@ -82,7 +82,7 @@
       <table class="w-full text-sm">
         <thead>
           <tr class="text-xs text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-200">
-            <th class="px-5 py-3 text-left font-semibold">Score</th>
+            <th class="px-5 py-3 text-left font-semibold">Signal Score</th>
             <th class="px-5 py-3 text-left font-semibold">Member</th>
             <th class="px-5 py-3 text-left font-semibold">Type</th>
             <th class="px-5 py-3 text-left font-semibold">Evidence</th>
@@ -105,7 +105,7 @@
             </td>
             <td class="px-5 py-3">
               <span class="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap">
-                {{ c.conflict_type | replace("_", " ") }}
+                {{ c.conflict_type | replace("_", " ") | replace("committee donor", "committee donor signal") }}
               </span>
             </td>
             <td class="px-5 py-3 text-slate-600 max-w-sm">
@@ -113,7 +113,10 @@
                 <summary class="cursor-pointer list-none text-xs leading-relaxed text-slate-500 hover:text-slate-700">
                   {{ (c.evidence_summary or "No evidence summary")[:110] }}{% if c.evidence_summary and c.evidence_summary|length > 110 %}…{% endif %}
                 </summary>
+                {% set detail = c.detail_json | fromjson if c.detail_json else {} %}
                 <div class="mt-2 text-xs leading-relaxed text-slate-600">{{ c.evidence_summary or "—" }}</div>
+                <div class="mt-2 text-[11px] text-slate-500">Evidence tier: {{ detail.evidence_tier or "—" }}</div>
+                <div class="mt-1 text-[11px] text-slate-500">Confidence reflects evidence quality, not legal certainty.</div>
               </details>
             </td>
             <td class="px-5 py-3 text-xs text-slate-400 whitespace-nowrap">
@@ -128,12 +131,12 @@
       </table>
     </div>
     <div class="px-5 py-3 border-t border-slate-100 text-xs text-slate-400">
-      Showing {{ conflicts | length }} conflicts · <a href="/api/conflicts" target="_blank" class="text-blue-500 hover:underline">JSON API</a>
+      Showing {{ conflicts | length }} signals · <a href="/api/conflicts" target="_blank" class="text-blue-500 hover:underline">JSON API</a>
     </div>
     {% else %}
     <div class="py-20 text-center text-slate-400">
       <div class="text-4xl mb-3">✅</div>
-      <div class="text-sm font-medium">No conflicts match your filters</div>
+      <div class="text-sm font-medium">No signals match your filters</div>
       <div class="text-xs mt-1">
         {% if search or confidence or conflict_type or chamber %}
           <a href="/conflicts" class="text-blue-500 hover:underline">Clear filters</a>

@@ -21,11 +21,13 @@ setup(
         "jinja2>=3.1",
         "pandas>=2.0",
         "click>=8.1",
+        "pytest>=8.0",
         "tenacity>=8.2",
         "ratelimit>=2.2",
     ],
     entry_points={
         "console_scripts": [
+            "lh=lighthouse.cli:main",
             "lh-ingest=scripts.ingest:cli",
             "lh-detect=scripts.detect:cli",
             "lh-report=scripts.report:cli",

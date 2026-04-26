@@ -1,7 +1,7 @@
 """
 Rule: Member received campaign donations from industries
 that their committee assignments regulate.
-This is a structural conflict — not single-event but sustained.
+This is a structural ethics signal, not proof of quid pro quo or improper influence.
 """
 from ..rules.vote_holding import ConflictCandidate
 from ...detection.industry_map import committee_sectors
@@ -48,6 +48,10 @@ def detect(
                         "election_cycle": contrib.get("election_cycle"),
                         "sector": sector,
                         "committees": [c.get("committee_name") for c in committees],
+                        "committee_jurisdiction_match": True,
+                        "sector_match": True,
+                        "source_quality": "public_fec_records_with_committee_metadata",
+                        "fec_committee_id": contrib.get("fec_committee_id"),
                     },
                 ))
                 break  # one conflict per contribution
@@ -77,21 +81,19 @@ def _industry_matches_sector(industry: str, sector: str) -> bool:
 
 
 def _compute_score(contrib: dict, committees: list[dict]) -> float:
-    score = 40.0
+    score = 18.0
 
     amount = float(contrib.get("amount") or 0)
     if amount >= 10000:
-        score += 25.0
+        score += 16.0
     elif amount >= 5000:
-        score += 15.0
+        score += 10.0
     elif amount >= 2000:
+        score += 6.0
+
+    if contrib.get("contribution_type") == "pac":
         score += 8.0
 
-    # PAC donations are more systemic than individual
-    if contrib.get("contribution_type") == "pac":
-        score += 10.0
-
-    # Chair/ranking member has more influence → higher conflict potential
     roles = {c.get("role", "") for c in committees}
     if "chair" in roles or "ranking" in roles:
         score += 10.0

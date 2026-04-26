@@ -9,13 +9,13 @@ from sqlalchemy.orm import Session
 
 from .models import (
     Asset, Bill, BillCosponsor, CampaignContribution, CommitteeMembership,
-    Conflict, FinancialDisclosure, Member, MemberIdentifier, MemberVote,
+    Conflict, FinancialDisclosure, IngestionLog, Member, MemberIdentifier, MemberVote,
     StockTransaction, Vote,
 )
 
 
 def get_members(session: Session, bioguide_id: Optional[str] = None) -> list[Member]:
-    q = session.query(Member).filter(Member.is_active == True)
+    q = session.query(Member).filter(Member.is_active.is_(True))
     if bioguide_id:
         q = q.filter(Member.bioguide_id == bioguide_id)
     return q.all()
@@ -37,6 +37,9 @@ def get_member_votes_with_bills(session: Session, bioguide_id: str) -> list[dict
             "vote_date": str(v.vote_date) if v.vote_date else None,
             "policy_area": b.policy_area if b else None,
             "subjects_json": b.subjects_json if b else "[]",
+            "vote_source_url": v.source_url,
+            "bill_source_url": b.govinfo_url if b else None,
+            "bill_title": (b.short_title or b.title) if b else None,
         }
         for mv, v, b in rows
     ]
@@ -56,6 +59,9 @@ def get_all_votes_with_bills(session: Session, congress: int) -> list[dict]:
             "vote_date": str(v.vote_date) if v.vote_date else None,
             "policy_area": b.policy_area if b else None,
             "subjects_json": b.subjects_json if b else "[]",
+            "vote_source_url": v.source_url,
+            "bill_source_url": b.govinfo_url if b else None,
+            "bill_title": (b.short_title or b.title) if b else None,
         }
         for v, b in rows
     ]
@@ -65,24 +71,30 @@ def get_member_assets(
     session: Session, bioguide_id: str, min_value: float = 1000.0
 ) -> list[dict]:
     rows = (
-        session.query(Asset)
+        session.query(Asset, FinancialDisclosure)
+        .join(FinancialDisclosure, Asset.disclosure_id == FinancialDisclosure.id)
         .filter(Asset.bioguide_id == bioguide_id)
-        .filter((Asset.value_max == None) | (Asset.value_max >= min_value))
+        .filter((Asset.value_max.is_(None)) | (Asset.value_max >= min_value))
         .all()
     )
     return [
         {
-            "id": a.id,
-            "asset_name": a.asset_name,
-            "asset_type": a.asset_type,
-            "ticker": a.ticker,
-            "value_min": float(a.value_min) if a.value_min else None,
-            "value_max": float(a.value_max) if a.value_max else None,
-            "owner": a.owner,
-            "year": a.year,
-            "sector": a.sector,
+            "id": asset.id,
+            "asset_name": asset.asset_name,
+            "asset_type": asset.asset_type,
+            "ticker": asset.ticker,
+            "value_min": float(asset.value_min) if asset.value_min else None,
+            "value_max": float(asset.value_max) if asset.value_max else None,
+            "owner": asset.owner,
+            "year": asset.year,
+            "sector": asset.sector,
+            "disclosure_id": disclosure.id,
+            "disclosure_source": disclosure.source,
+            "disclosure_source_url": disclosure.source_url,
+            "disclosure_filed_date": str(disclosure.filed_date) if disclosure.filed_date else None,
+            "disclosure_raw_file_path": disclosure.raw_file_path,
         }
-        for a in rows
+        for asset, disclosure in rows
     ]
 
 
@@ -105,6 +117,7 @@ def get_member_transactions(session: Session, bioguide_id: str) -> list[dict]:
             "amount_max": float(t.amount_max) if t.amount_max else None,
             "owner": t.owner,
             "sector": t.sector,
+            "source": t.source,
         }
         for t in rows
     ]
@@ -224,6 +237,7 @@ def get_contributions(session: Session, bioguide_id: str) -> list[dict]:
             "contribution_date": str(c.contribution_date) if c.contribution_date else None,
             "election_cycle": c.election_cycle,
             "contribution_type": c.contribution_type,
+            "fec_committee_id": c.fec_committee_id,
         }
         for c in rows
     ]
@@ -284,6 +298,7 @@ def _bill_to_dict(b: Bill) -> dict:
         "industries_json": b.industries_json or "[]",
         "sponsor_bioguide": b.sponsor_bioguide,
         "introduced_date": str(b.introduced_date) if b.introduced_date else None,
+        "govinfo_url": b.govinfo_url,
     }
 
 
@@ -389,7 +404,7 @@ def get_dashboard_stats(session: Session) -> dict:
     # Breakdown by sector (from detail_json — approximation via asset sector)
     sector_counts = (
         session.query(Asset.sector, func.count(Asset.id))
-        .filter(Asset.sector != None)
+        .filter(Asset.sector.is_not(None))
         .group_by(Asset.sector)
         .order_by(func.count(Asset.id).desc())
         .limit(8)
@@ -407,6 +422,7 @@ def get_dashboard_stats(session: Session) -> dict:
         "flagged_members": flagged,
         "by_type": {t: c for t, c in type_counts},
         "by_sector": {s: c for s, c in sector_counts if s},
+        "data_coverage": get_data_coverage(session),
     }
 
 
@@ -432,7 +448,7 @@ def get_members_with_scores(
             func.sum(case((Conflict.confidence == "high", 1), else_=0)).label("high_count"),
         )
         .outerjoin(Conflict, Conflict.bioguide_id == Member.bioguide_id)
-        .filter(Member.is_active == True)
+        .filter(Member.is_active.is_(True))
         .group_by(Member.bioguide_id)
     )
 
@@ -505,6 +521,7 @@ def get_all_conflicts(
             "score": round(c.score, 1),
             "confidence": c.confidence,
             "evidence_summary": c.evidence_summary,
+            "detail_json": c.detail_json,
             "bill_id": c.bill_id,
             "vote_id": c.vote_id,
             "detected_at": str(c.detected_at)[:10] if c.detected_at else None,
@@ -559,6 +576,7 @@ def get_top_conflicts(session: Session, limit: int = 10) -> list[dict]:
                 "score": round(c.score, 1),
                 "confidence": c.confidence,
                 "evidence_summary": c.evidence_summary,
+                "detail_json": c.detail_json,
                 "bill_id": c.bill_id,
                 "vote_id": c.vote_id,
                 "detected_at": str(c.detected_at)[:10] if c.detected_at else None,
@@ -599,3 +617,42 @@ def get_recent_transactions(session: Session, limit: int = 20) -> list[dict]:
 def _profile_image_url(bioguide_id: str) -> str:
     initial = (bioguide_id or "X")[:1].upper()
     return f"https://bioguide.congress.gov/bioguide/photo/{initial}/{bioguide_id.upper()}.jpg"
+
+
+def get_data_coverage(session: Session) -> dict:
+    house_votes = session.query(func.count(Vote.vote_id)).filter(Vote.chamber == "house").scalar() or 0
+    senate_votes = session.query(func.count(Vote.vote_id)).filter(Vote.chamber == "senate").scalar() or 0
+    house_disclosures = (
+        session.query(func.count(FinancialDisclosure.id))
+        .filter(FinancialDisclosure.source == "house")
+        .scalar()
+        or 0
+    )
+    senate_disclosures = (
+        session.query(func.count(FinancialDisclosure.id))
+        .filter(FinancialDisclosure.source == "senate")
+        .scalar()
+        or 0
+    )
+    fec_contributions = session.query(func.count(CampaignContribution.id)).scalar() or 0
+
+    ingestion_rows = session.query(IngestionLog).order_by(IngestionLog.source).all()
+
+    return {
+        "house_votes": int(house_votes),
+        "senate_votes": int(senate_votes),
+        "senate_votes_status": "partial_or_unavailable" if senate_votes == 0 else "loaded",
+        "house_disclosures": int(house_disclosures),
+        "senate_disclosures": int(senate_disclosures),
+        "fec_contributions": int(fec_contributions),
+        "last_ingestion_by_source": [
+            {
+                "source": row.source,
+                "last_run": str(row.last_run) if row.last_run else None,
+                "status": row.status,
+                "records_added": row.records_added,
+                "records_updated": row.records_updated,
+            }
+            for row in ingestion_rows
+        ],
+    }

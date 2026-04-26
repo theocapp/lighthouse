@@ -39,6 +39,9 @@ class DataConfig:
     billstatus_xml_dir: str = "./data/billstatus_xml"
     bill_cache_days: int = 1
     disclosure_cache_days: int = 7
+    disclosure_year: int = 2024
+    ptr_year: int = 2024
+    fec_cycle: int = 2024
 
 
 @dataclass

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI: Run conflict detection.
+CLI: Run signal detection.
 
 Usage:
     python scripts/detect.py                         # all members
@@ -43,7 +43,7 @@ def cli(member, congress, config_path):
         )
         click.echo(
             f"Detection complete: {stats['members_processed']} members processed, "
-            f"{stats['conflicts_found']} conflicts detected."
+            f"{stats['conflicts_found']} signals detected."
         )
     except Exception as exc:
         click.echo(f"Error: {exc}", err=True)

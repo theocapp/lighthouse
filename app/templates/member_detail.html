@@ -9,6 +9,10 @@
 
 {% block content %}
 
+<div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+  {{ report.disclaimer }}
+</div>
+
 <!-- ── Hero header ─────────────────────────────────────────────────── -->
 <div class="bg-white border border-slate-200 rounded-xl shadow-sm px-6 py-5 mb-5 flex flex-wrap gap-6 items-start">
 
@@ -31,9 +35,9 @@
         <span class="text-xl font-bold text-slate-900">{{ report.member.full_name }}</span>
         <span class="px-2 py-0.5 rounded text-xs font-bold badge-{{ report.member.party }}">{{ report.member.party }}</span>
         {% if report.summary.max_score >= 53 %}
-        <span class="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700">High COI Risk</span>
+        <span class="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700">Strong Signal</span>
         {% elif report.summary.total_conflicts > 0 %}
-        <span class="px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-700">COI Flagged</span>
+        <span class="px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-700">Signal Detected</span>
         {% endif %}
       </div>
       <div class="text-sm text-slate-500 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
@@ -68,11 +72,11 @@
   <!-- Key stats grid -->
   <div class="grid grid-cols-3 sm:grid-cols-6 gap-3">
     {% set stat_cells = [
-      (report.summary.max_score, "Max Score",
+      (report.summary.max_score, "Signal Score",
         "text-red-600" if report.summary.max_score >= 53
         else ("text-amber-600" if report.summary.max_score >= 35 else "text-slate-500")),
-      (report.summary.high_confidence, "High Risk", "text-red-600"),
-      (report.summary.total_conflicts, "Conflicts", "text-slate-800"),
+      (report.summary.high_confidence, "High Evidence", "text-red-600"),
+      (report.summary.total_conflicts, "Signals", "text-slate-800"),
       (report.summary.total_assets, "Assets", "text-slate-600"),
       (report.summary.total_transactions, "Trades", "text-blue-600"),
       (report.voting.stats.total, "Votes Cast", "text-slate-500"),
@@ -414,20 +418,20 @@
 {% if not report.conflicts %}
 <div class="bg-green-50 border border-green-200 rounded-xl px-6 py-10 text-center mb-5">
   <div class="text-3xl mb-2">✅</div>
-  <div class="text-green-800 font-semibold">No conflicts detected</div>
-  <div class="text-green-600 text-sm mt-1">No significant overlap found between holdings and legislative activity.</div>
+  <div class="text-green-800 font-semibold">No signals detected</div>
+  <div class="text-green-600 text-sm mt-1">No significant public-data overlap was identified in the current dataset.</div>
 </div>
 {% else %}
 <details open class="bg-white border border-slate-200 rounded-xl shadow-sm mb-5 overflow-hidden">
   <summary class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700 cursor-pointer list-none">
-    Detected Conflicts
-    <span class="ml-2 text-xs text-slate-400 font-normal">{{ report.conflicts | length }} records · sorted by score</span>
+    Detected Signals
+    <span class="ml-2 text-xs text-slate-400 font-normal">{{ report.conflicts | length }} records · sorted by signal score</span>
   </summary>
   <div class="overflow-x-auto max-h-96">
     <table class="w-full text-sm">
       <thead class="sticky top-0 bg-slate-50 border-b border-slate-100">
         <tr class="text-xs text-slate-500 uppercase tracking-wide">
-          <th class="px-5 py-3 text-left font-semibold">Score</th>
+          <th class="px-5 py-3 text-left font-semibold">Signal Score</th>
           <th class="px-5 py-3 text-left font-semibold">Type</th>
           <th class="px-5 py-3 text-left font-semibold">Evidence</th>
           <th class="px-5 py-3 text-left font-semibold">Bill / Vote</th>
@@ -449,6 +453,10 @@
                 {{ (c.evidence_summary or "No evidence summary")[:90] }}{% if c.evidence_summary and c.evidence_summary|length > 90 %}…{% endif %}
               </summary>
               <div class="mt-2 leading-relaxed text-slate-600">{{ c.evidence_summary or "—" }}</div>
+              <div class="mt-2 text-[11px] text-slate-500">Evidence confidence: {{ c.confidence | title }} · reflects evidence quality, not legal certainty.</div>
+              {% if c.detail.evidence_tier %}
+              <div class="mt-1 text-[11px] text-slate-500">Evidence tier: {{ c.detail.evidence_tier }}</div>
+              {% endif %}
             </details>
           </td>
           <td class="px-5 py-3 text-xs text-slate-400 font-mono">
@@ -636,7 +644,7 @@
   <a href="/api/members/{{ report.member.bioguide_id }}/conflicts" target="_blank"
      class="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-slate-600 hover:border-blue-400 hover:text-blue-600 transition-colors shadow-sm">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-    Conflicts JSON
+    Signals JSON
   </a>
   <a href="/members" class="flex items-center gap-2 text-slate-400 hover:text-slate-600 px-3 py-2.5 transition-colors">
     ← All Members

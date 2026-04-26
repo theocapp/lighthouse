@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI: Generate conflict reports.
+CLI: Generate signal reports.
 
 Usage:
     python scripts/report.py --member A000370

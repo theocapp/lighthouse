@@ -1,6 +1,6 @@
 """
 Detection engine orchestrator.
-Runs all rules for one or all members and persists conflict records to the DB.
+Runs all rules for one or all members and persists scored public-data signals to the DB.
 """
 import json
 import logging
@@ -28,7 +28,7 @@ def run(
     family_discount: float = 0.6,
 ) -> dict[str, int]:
     """
-    Run all conflict detection rules.
+    Run all signal detection rules.
 
     Args:
         session: Active SQLAlchemy session

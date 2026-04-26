@@ -130,7 +130,7 @@ class IngestPipeline:
         members = (
             self.session.query(Member)
             .filter(
-                Member.is_active == True,
+                Member.is_active.is_(True),
                 Member.chamber == "house",
             )
             .all()
@@ -225,7 +225,7 @@ class IngestPipeline:
         from ..db.models import Member
 
         added = updated = 0
-        members = self.session.query(Member).filter(Member.is_active == True).all()
+        members = self.session.query(Member).filter(Member.is_active.is_(True)).all()
         for member in members:
             for raw in self._congress_api.get_member_sponsored_legislation(member.bioguide_id):
                 if raw.get("congress") != self.congress:
@@ -462,7 +462,7 @@ class IngestPipeline:
                     office_to_bioguide[code] = m.bioguide_id
 
         try:
-            all_filings = list(house_disc.get_all_filings_for_year(2024))
+            all_filings = list(house_disc.get_all_filings_for_year(self.config.data.ptr_year))
             ptr_filings = [f for f in all_filings if f.get("document_type") == "ptr"]
             log.info("House PTR bulk listing: %d PTR filings found", len(ptr_filings))
 
@@ -496,7 +496,7 @@ class IngestPipeline:
                     continue
                 try:
                     filings = house_disc.search_member(
-                        member.last_name, 2024,
+                        member.last_name, self.config.data.ptr_year,
                         state=member.state or "", district=member.district,
                     )
                     for filing in filings:
@@ -523,14 +523,14 @@ class IngestPipeline:
         self.session.query(Conflict).delete()
         self.session.query(Asset).delete()
         self.session.query(FinancialDisclosure).delete()
-        members = self.session.query(Member).filter(Member.is_active == True).all()
+        members = self.session.query(Member).filter(Member.is_active.is_(True)).all()
         disc_count = asset_count = 0
         senate_failures = 0
         skip_remaining_senate = False
 
         house_filings_by_office: dict[str, list[dict]] = {}
         try:
-            all_house_filings = list(house_coll.get_all_filings_for_year(2024))
+            all_house_filings = list(house_coll.get_all_filings_for_year(self.config.data.disclosure_year))
             for filing in all_house_filings:
                 office = _normalize_house_office(filing.get("office") or "")
                 if not office:
@@ -540,7 +540,7 @@ class IngestPipeline:
         except Exception as exc:
             log.warning("House year-wide disclosure listing failed, trying cached House search pages: %s", exc)
             try:
-                cached_house_filings = house_coll.get_cached_filings_for_year(2024)
+                cached_house_filings = house_coll.get_cached_filings_for_year(self.config.data.disclosure_year)
                 for filing in cached_house_filings:
                     office = _normalize_house_office(filing.get("office") or "")
                     if not office:
@@ -552,7 +552,7 @@ class IngestPipeline:
                 house_filings_by_office = {}
 
         for member in members:
-            year = 2024  # Most recent available
+            year = self.config.data.disclosure_year
             if skip_remaining_senate and member.chamber == "senate":
                 continue
             try:
@@ -651,13 +651,13 @@ class IngestPipeline:
 
         from ..db.models import Member
         members = self.session.query(Member).filter(
-            Member.is_active == True,
+            Member.is_active.is_(True),
         ).all()
 
         count = 0
         for member in members:
             try:
-                cycle = 2024
+                cycle = self.config.data.fec_cycle
                 seen_committee_ids = set()
                 fec_ids = q.get_member_fec_ids(self.session, member.bioguide_id)
                 if not fec_ids:
@@ -682,11 +682,11 @@ class IngestPipeline:
 
     def _ingest_fec_from_local_db(self) -> int:
         source_url = self.config.fec_warehouse.source_db_url
-        cycles = sorted(set(self.config.fec_warehouse.cycles or [2024]))
+        cycles = sorted(set(self.config.fec_warehouse.cycles or [self.config.data.fec_cycle]))
         source_engine = create_engine(source_url, echo=False)
 
         from ..db.models import Member
-        members = self.session.query(Member).filter(Member.is_active == True).all()
+        members = self.session.query(Member).filter(Member.is_active.is_(True)).all()
         member_ids = [m.bioguide_id for m in members]
 
         candidate_to_member: dict[str, str] = {}

@@ -1,13 +1,15 @@
 """
 Rule: Stock traded within N days of related bill/vote activity.
-Pre-vote trading (trade_timing_pre) is the most legally significant pattern.
-Post-vote trading (trade_timing_post) is suspicious but less actionable.
+Pre-vote trading is the strongest timing signal; post-vote trading is weaker.
 """
 import json
-from datetime import date, timedelta
-from typing import Optional
+from datetime import date
 
-from ..rules.vote_holding import ConflictCandidate
+from ..rules.vote_holding import (
+    ConflictCandidate,
+    _asset_name_matches_bill,
+    _is_narrow_industry_match,
+)
 from ...detection.industry_map import asset_name_is_diversified, bill_sectors, ticker_to_sector
 
 
@@ -66,6 +68,9 @@ def detect(
             policy_area = bill.get("policy_area") or ""
             subjects = json.loads(bill.get("subjects_json") or "[]")
             vote_sectors = bill_sectors(policy_area, subjects)
+            bill_text = " ".join(
+                part for part in [bill.get("title"), bill.get("short_title")] if part
+            ).lower()
 
             if txn_sector not in vote_sectors:
                 continue
@@ -84,6 +89,14 @@ def detect(
                 continue
 
             raw_score = _compute_score(txn, proximity, conflict_type)
+            exact_ticker_match = bool(ticker and ticker.lower() in bill_text)
+            exact_company_match = _asset_name_matches_bill(txn.get("asset_name"), bill_text)
+            narrow_industry_match = not (exact_ticker_match or exact_company_match) and _is_narrow_industry_match(
+                bill_text,
+                policy_area,
+                subjects,
+                txn_sector,
+            )
 
             results.append(ConflictCandidate(
                 conflict_type=conflict_type,
@@ -100,6 +113,15 @@ def detect(
                     "amount_max": txn.get("amount_max"),
                     "sector": txn_sector,
                     "owner": txn.get("owner"),
+                    "bill_title": bill.get("short_title") or bill.get("title"),
+                    "exact_ticker_match": exact_ticker_match,
+                    "exact_company_match": exact_company_match,
+                    "narrow_industry_match": narrow_industry_match,
+                    "sector_match": True,
+                    "source_quality": "public_disclosure_with_transaction_and_vote_records",
+                    "bill_source_url": bill.get("govinfo_url"),
+                    "vote_source_url": vote.get("vote_source_url"),
+                    "transaction_source": txn.get("source"),
                 },
             ))
 
@@ -107,27 +129,28 @@ def detect(
 
 
 def _compute_score(txn: dict, proximity: float, conflict_type: str) -> float:
-    score = 40.0 + 40.0 * proximity  # base 40–80 based on timing
+    score = 24.0 + 28.0 * proximity
 
-    # Larger trades are more suspicious
+    # Larger disclosed trades raise signal strength.
     amount = float(txn.get("amount_max") or 0)
     if amount >= 1_000_000:
-        score += 15.0
+        score += 18.0
     elif amount >= 100_000:
-        score += 8.0
+        score += 10.0
     elif amount >= 15_000:
-        score += 3.0
+        score += 4.0
 
-    # Sales before votes are more suspicious than purchases
+    # Sales before votes get a modest bump.
     txn_type = txn.get("transaction_type", "")
     if conflict_type == "trade_timing_pre" and "sale" in txn_type:
-        score += 5.0
+        score += 6.0
 
-    # Family discount
     owner = txn.get("owner", "self")
     if owner == "spouse":
-        score *= 0.6
+        score *= 0.55
     elif owner == "dependent":
         score *= 0.4
+    elif owner == "joint":
+        score *= 0.75
 
     return min(score, 100.0)

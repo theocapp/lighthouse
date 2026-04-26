@@ -1,5 +1,5 @@
 """
-Rule: Spouse or dependent asset creates an indirect conflict on a vote.
+Rule: Spouse or dependent asset creates an indirect signal on a vote.
 Logic mirrors vote_holding.py but applies a score discount for indirect ownership.
 """
 import json
@@ -80,6 +80,13 @@ def detect(
                         "value_max": asset.get("value_max"),
                         "owner": asset.get("owner"),
                         "family_discount": family_discount,
+                        "sector_match": True,
+                        "source_quality": "public_disclosure_with_bill_and_vote_records",
+                        "bill_source_url": bill.get("govinfo_url"),
+                        "vote_source_url": vote_rec.get("vote_source_url"),
+                        "asset_source_url": asset.get("disclosure_source_url"),
+                        "asset_parser_source": asset.get("disclosure_source"),
+                        "disclosure_id": asset.get("disclosure_id"),
                     },
                 ))
 

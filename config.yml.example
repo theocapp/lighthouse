@@ -24,6 +24,9 @@ data:
   billstatus_xml_dir: "./data/billstatus_xml"
   bill_cache_days: 1
   disclosure_cache_days: 7
+  disclosure_year: 2024
+  ptr_year: 2024
+  fec_cycle: 2024
 
 fec_warehouse:
   source_db_url: ""         # optional local bulk FEC Postgres db, e.g. postgresql+psycopg:///fec_complete?host=/tmp

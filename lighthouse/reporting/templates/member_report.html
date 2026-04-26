@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lighthouse — {{ report.member.full_name }} Conflict Report</title>
+  <title>Lighthouse — {{ report.member.full_name }} Signal Report</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; color: #222; }
@@ -53,11 +53,15 @@
 <body>
 
 <header>
-  <h1>Lighthouse — Congressional Conflict of Interest Report</h1>
+  <h1>Lighthouse — Congressional Ethics Signal Report</h1>
   <p>Generated {{ report.generated_at }} · Data from Congress.gov, SEC EDGAR, House/Senate Financial Disclosures, OpenFEC</p>
 </header>
 
 <div class="container">
+
+  <div style="background:#fef3c7; border:1px solid #fcd34d; color:#78350f; border-radius:8px; padding:0.9rem 1rem; margin-bottom:1.5rem; font-size:0.9rem;">
+    {{ report.disclaimer }}
+  </div>
 
   <!-- Member Card -->
   <div class="member-card">
@@ -82,12 +86,12 @@
   <!-- Summary Stats -->
   <div class="summary-grid">
     <div class="stat-card">
-      <div class="value">{{ report.summary.total_conflicts }}</div>
-      <div class="label">Total Conflicts</div>
+      <div class="value">{{ report.summary.total_signals }}</div>
+      <div class="label">Total Signals</div>
     </div>
     <div class="stat-card">
       <div class="value stat-high">{{ report.summary.high_confidence }}</div>
-      <div class="label">High Confidence</div>
+      <div class="label">High Evidence</div>
     </div>
     <div class="stat-card">
       <div class="value stat-medium">{{ report.summary.medium_confidence }}</div>
@@ -99,7 +103,7 @@
     </div>
     <div class="stat-card">
       <div class="value">{{ report.summary.max_score }}</div>
-      <div class="label">Max Score</div>
+      <div class="label">Signal Score</div>
     </div>
     <div class="stat-card">
       <div class="value">{{ report.summary.total_assets }}</div>
@@ -114,14 +118,14 @@
   <!-- Conflicts Table -->
   <div class="section">
     <div class="section-header">
-      Detected Conflicts
+      Detected Signals
       <span class="count">{{ report.conflicts | length }} records</span>
     </div>
     {% if report.conflicts %}
     <table>
       <thead>
         <tr>
-          <th>Score</th>
+          <th>Signal Score</th>
           <th>Type</th>
           <th>Evidence</th>
           <th>Bill / Vote</th>
@@ -138,13 +142,14 @@
           <td><span class="type-badge">{{ c.conflict_type | replace('_', ' ') }}</span></td>
           <td>
             <div>{{ c.evidence_summary }}</div>
+            {% set detail = c.detail_json | fromjson if c.detail_json else {} %}
+            <div class="evidence">Confidence: {{ c.confidence }} · Tier: {{ detail.evidence_tier or '—' }}</div>
           </td>
           <td style="font-size:0.8rem; color:#555;">
             {% if c.bill_id %}<div>{{ c.bill_id }}</div>{% endif %}
             {% if c.vote_id %}<div>{{ c.vote_id }}</div>{% endif %}
           </td>
           <td style="font-size:0.8rem; color:#555;">
-            {% set detail = c.detail_json | fromjson if c.detail_json else {} %}
             {% if detail.ticker %}<div><strong>{{ detail.ticker }}</strong></div>{% endif %}
             {% if detail.asset_name %}<div>{{ detail.asset_name[:40] }}</div>{% endif %}
           </td>
@@ -154,7 +159,7 @@
       </tbody>
     </table>
     {% else %}
-    <div class="empty">No conflicts detected for this member.</div>
+    <div class="empty">No signals detected for this member.</div>
     {% endif %}
   </div>
 
@@ -244,7 +249,7 @@
 
 <footer>
   <p>Lighthouse · Built with public data from Congress.gov, SEC EDGAR, House &amp; Senate Financial Disclosures, and the Federal Election Commission.</p>
-  <p style="margin-top:0.5rem;">This report flags potential conflicts of interest for public transparency. It does not constitute legal findings or accusations of wrongdoing.</p>
+  <p style="margin-top:0.5rem;">Lighthouse surfaces public-data signals for review. It does not prove corruption, illegality, intent, or misconduct.</p>
 </footer>
 
 </body>

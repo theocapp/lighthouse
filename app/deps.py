@@ -10,12 +10,19 @@ from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
 
 _config = load_config()
-_engine = init_db(_config.database.url)
-_SessionLocal = sessionmaker(bind=_engine)
+_SessionLocal = None
+
+
+def _get_session_local():
+    global _SessionLocal
+    if _SessionLocal is None:
+        engine = init_db(_config.database.url)
+        _SessionLocal = sessionmaker(bind=engine)
+    return _SessionLocal
 
 
 def get_session() -> Generator[Session, None, None]:
-    session = _SessionLocal()
+    session = _get_session_local()()
     try:
         yield session
     finally:

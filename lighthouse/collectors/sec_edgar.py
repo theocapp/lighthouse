@@ -17,7 +17,7 @@ class SecEdgarCollector(BaseCollector):
     def __init__(self, cache_dir: Path, rate: float = 8.0):
         super().__init__(rate=rate, cache_dir=cache_dir / "sec_edgar", cache_ttl_days=7)
         self._session.headers["User-Agent"] = (
-            "Lighthouse Congressional COI Tracker contact@lighthouse.dev"
+            "Lighthouse Congressional Ethics Signal Explorer contact@lighthouse.dev"
         )
 
     def search_company_cik(self, name: str) -> Optional[str]:

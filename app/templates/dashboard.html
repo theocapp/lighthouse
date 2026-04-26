@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block heading %}Dashboard{% endblock %}
-{% block subheading %}Overview of congressional conflicts of interest — {{ stats.total_members }} members tracked{% endblock %}
+{% block subheading %}Overview of public-data ethics signals — {{ stats.total_members }} members tracked{% endblock %}
 
 {% block content %}
 
 <!-- Stat cards -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
   {% set cards = [
-    ("Flagged Members", stats.flagged_members, "Medium or high-confidence COI", "text-emerald-700", "bg-emerald-50", "/members?sort=score"),
-    ("Total Conflicts", stats.total_conflicts, stats.high_confidence ~ " high · " ~ stats.medium_confidence ~ " med · " ~ stats.low_confidence ~ " low", "text-slate-800", "bg-white", "/conflicts"),
+    ("Flagged Members", stats.flagged_members, "Medium or high-evidence signals", "text-emerald-700", "bg-emerald-50", "/members?sort=score"),
+    ("Total Signals", stats.total_conflicts, stats.high_confidence ~ " high · " ~ stats.medium_confidence ~ " med · " ~ stats.low_confidence ~ " low", "text-slate-800", "bg-white", "/conflicts"),
     ("Stock Trades Tracked", stats.total_trades, "STOCK Act disclosures", "text-emerald-700", "bg-emerald-50", "/trades"),
     ("Assets Disclosed", stats.total_assets, "Financial disclosures", "text-slate-800", "bg-white", "/members?sort=score"),
   ] %}
@@ -29,7 +29,7 @@
   <!-- Conflicts by type chart -->
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
     <div class="flex items-center justify-between mb-4">
-      <div class="text-sm font-semibold text-slate-700">Conflicts by Type</div>
+      <div class="text-sm font-semibold text-slate-700">Signals by Type</div>
       <a href="/conflicts" class="text-xs text-emerald-600 hover:underline">Explore</a>
     </div>
     <canvas id="typeChart" height="220"></canvas>
@@ -38,7 +38,7 @@
   <!-- Confidence breakdown donut -->
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col">
     <div class="flex items-center justify-between mb-4">
-      <div class="text-sm font-semibold text-slate-700">Confidence Breakdown</div>
+      <div class="text-sm font-semibold text-slate-700">Evidence Confidence</div>
       <a href="/conflicts" class="text-xs text-emerald-600 hover:underline">Inspect</a>
     </div>
     <div class="flex-1 flex items-center justify-center">
@@ -91,7 +91,7 @@
           <div class="mt-3 grid grid-cols-3 gap-2 text-center">
             <div class="bg-slate-50 rounded-lg px-2 py-2">
               <div class="text-sm font-bold text-slate-800">{{ m.conflict_count or 0 }}</div>
-              <div class="text-[10px] text-slate-400 uppercase tracking-wide">Conflicts</div>
+              <div class="text-[10px] text-slate-400 uppercase tracking-wide">Signals</div>
             </div>
             <div class="bg-slate-50 rounded-lg px-2 py-2">
               <div class="text-sm font-bold text-red-600">{{ m.max_score or 0 }}</div>
@@ -115,10 +115,10 @@
   {% endif %}
 </div>
 
-<!-- Top conflicts table -->
+<!-- Top signals table -->
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm mb-6">
   <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-    <span class="font-semibold text-sm text-slate-700">Top Conflicts by Score</span>
+    <span class="font-semibold text-sm text-slate-700">Top Signals by Score</span>
     <a href="/conflicts" class="text-xs text-emerald-600 hover:underline">View all →</a>
   </div>
   {% if top_conflicts %}
@@ -126,7 +126,7 @@
     <table class="w-full text-sm">
       <thead>
         <tr class="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
-          <th class="px-5 py-3 text-left font-semibold">Score</th>
+          <th class="px-5 py-3 text-left font-semibold">Signal Score</th>
           <th class="px-5 py-3 text-left font-semibold">Member</th>
           <th class="px-5 py-3 text-left font-semibold">Type</th>
           <th class="px-5 py-3 text-left font-semibold">Evidence</th>
@@ -165,9 +165,21 @@
   </div>
   {% else %}
   <div class="px-5 py-12 text-center text-slate-400 text-sm">
-    No conflicts detected yet. Run <code class="bg-slate-100 px-1.5 py-0.5 rounded text-xs">python scripts/detect.py</code> to populate.
+    No signals detected yet. Run <code class="bg-slate-100 px-1.5 py-0.5 rounded text-xs">python scripts/detect.py</code> to populate.
   </div>
   {% endif %}
+</div>
+
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm mb-6 p-5">
+  <div class="text-sm font-semibold text-slate-700 mb-3">Data Coverage</div>
+  <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 text-sm">
+    <div class="bg-slate-50 rounded-lg px-3 py-3"><div class="text-xs text-slate-400 uppercase tracking-wide">House Votes</div><div class="mt-1 font-semibold text-slate-800">{{ stats.data_coverage.house_votes }}</div></div>
+    <div class="bg-slate-50 rounded-lg px-3 py-3"><div class="text-xs text-slate-400 uppercase tracking-wide">Senate Votes</div><div class="mt-1 font-semibold text-slate-800">{{ stats.data_coverage.senate_votes }}</div><div class="text-[11px] text-slate-400">{{ stats.data_coverage.senate_votes_status | replace("_", " ") }}</div></div>
+    <div class="bg-slate-50 rounded-lg px-3 py-3"><div class="text-xs text-slate-400 uppercase tracking-wide">House Disclosures</div><div class="mt-1 font-semibold text-slate-800">{{ stats.data_coverage.house_disclosures }}</div></div>
+    <div class="bg-slate-50 rounded-lg px-3 py-3"><div class="text-xs text-slate-400 uppercase tracking-wide">Senate Disclosures</div><div class="mt-1 font-semibold text-slate-800">{{ stats.data_coverage.senate_disclosures }}</div></div>
+    <div class="bg-slate-50 rounded-lg px-3 py-3"><div class="text-xs text-slate-400 uppercase tracking-wide">FEC Contributions</div><div class="mt-1 font-semibold text-slate-800">{{ stats.data_coverage.fec_contributions }}</div></div>
+    <div class="bg-slate-50 rounded-lg px-3 py-3"><div class="text-xs text-slate-400 uppercase tracking-wide">Ingestion Logs</div><div class="mt-1 font-semibold text-slate-800">{{ stats.data_coverage.last_ingestion_by_source | length }}</div></div>
+  </div>
 </div>
 
 <!-- Recent trades -->
