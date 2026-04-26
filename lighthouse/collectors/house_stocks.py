@@ -3,6 +3,8 @@ House Stock Watcher collector.
 API: https://housestockwatcher.com/api
 Returns all congressional stock transactions for House members.
 """
+import hashlib
+import json
 from datetime import date
 from pathlib import Path
 from typing import Optional
@@ -66,6 +68,10 @@ def normalize_house_transaction(raw: dict, bioguide_lookup: dict) -> Optional[di
         "owner": _normalize_owner(raw.get("owner", "")),
         "source": "house_watcher",
         "comment": raw.get("comment"),
+        "source_url": API_URL,
+        "source_file": None,
+        "source_key": str(raw.get("id") or raw.get("ptr_link") or _row_hash(raw)),
+        "source_hash": _row_hash(raw),
         "sector": None,
         "industry_code": None,
     }
@@ -126,3 +132,7 @@ def _parse_amount_range(raw: str) -> tuple[Optional[float], Optional[float]]:
     if len(nums) == 1:
         return float(nums[0]), None
     return None, None
+
+
+def _row_hash(raw: dict) -> str:
+    return hashlib.sha256(json.dumps(raw, sort_keys=True, default=str).encode("utf-8")).hexdigest()

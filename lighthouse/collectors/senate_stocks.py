@@ -11,6 +11,7 @@ from .house_stocks import (
     _normalize_owner,
     _normalize_type,
     _parse_amount_range,
+    _row_hash,
     _resolve_bioguide,
 )
 
@@ -65,6 +66,10 @@ def normalize_senate_transaction(raw: dict, bioguide_lookup: dict) -> Optional[d
         "owner": _normalize_owner(raw.get("owner", "")),
         "source": "senate_watcher",
         "comment": raw.get("comment"),
+        "source_url": API_URL,
+        "source_file": None,
+        "source_key": str(raw.get("id") or raw.get("ptr_link") or _row_hash(raw)),
+        "source_hash": _row_hash(raw),
         "sector": None,
         "industry_code": None,
     }

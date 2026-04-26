@@ -99,6 +99,10 @@ class FecCollector(BaseCollector):
 
 
 def normalize_contribution(raw: dict, bioguide_id: str) -> dict:
+    source_sub_id = raw.get("sub_id")
+    source_image_num = raw.get("image_num") or raw.get("image_number")
+    source_transaction_id = raw.get("transaction_id") or raw.get("tran_id")
+    source_hash = json.dumps(raw, sort_keys=True, default=str)
     return {
         "bioguide_id": bioguide_id,
         "fec_committee_id": raw.get("committee_id"),
@@ -109,4 +113,12 @@ def normalize_contribution(raw: dict, bioguide_id: str) -> dict:
         "contribution_date": (raw.get("contribution_receipt_date") or "")[:10] or None,
         "election_cycle": raw.get("two_year_transaction_period"),
         "contribution_type": "pac" if raw.get("entity_type") == "PAC" else "individual",
+        "source_table": "api.openfec.schedule_a",
+        "source_key": str(source_sub_id or source_transaction_id or source_image_num or ""),
+        "source_url": f"{BASE_URL}/schedules/schedule_a",
+        "source_file": None,
+        "source_hash": __import__("hashlib").sha256(source_hash.encode("utf-8")).hexdigest(),
+        "source_sub_id": str(source_sub_id) if source_sub_id is not None else None,
+        "source_image_num": str(source_image_num) if source_image_num is not None else None,
+        "source_transaction_id": str(source_transaction_id) if source_transaction_id is not None else None,
     }

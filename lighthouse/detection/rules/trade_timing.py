@@ -17,7 +17,7 @@ def detect(
     transactions: list[dict],
     votes: list[dict],
     bills: dict,
-    window_days: int = 30,
+    window_days: int = 21,
 ) -> list[ConflictCandidate]:
     """
     transactions: list of {id, ticker, transaction_date, transaction_type, amount_max, sector, owner}
@@ -122,6 +122,10 @@ def detect(
                     "bill_source_url": bill.get("govinfo_url"),
                     "vote_source_url": vote.get("vote_source_url"),
                     "transaction_source": txn.get("source"),
+                    "transaction_source_url": txn.get("source_url"),
+                    "transaction_source_file": txn.get("source_file"),
+                    "transaction_source_key": txn.get("source_key"),
+                    "transaction_source_hash": txn.get("source_hash"),
                 },
             ))
 
@@ -129,7 +133,7 @@ def detect(
 
 
 def _compute_score(txn: dict, proximity: float, conflict_type: str) -> float:
-    score = 24.0 + 28.0 * proximity
+    score = 30.0 + 22.0 * proximity
 
     # Larger disclosed trades raise signal strength.
     amount = float(txn.get("amount_max") or 0)

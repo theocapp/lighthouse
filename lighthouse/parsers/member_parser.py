@@ -10,6 +10,66 @@ _PARTY_MAP = {
     "Democratic": "D",
 }
 
+_STATE_NAME_TO_CODE = {
+    "Alabama": "AL",
+    "Alaska": "AK",
+    "Arizona": "AZ",
+    "Arkansas": "AR",
+    "California": "CA",
+    "Colorado": "CO",
+    "Connecticut": "CT",
+    "Delaware": "DE",
+    "District of Columbia": "DC",
+    "American Samoa": "AS",
+    "Florida": "FL",
+    "Georgia": "GA",
+    "Guam": "GU",
+    "Hawaii": "HI",
+    "Idaho": "ID",
+    "Illinois": "IL",
+    "Indiana": "IN",
+    "Iowa": "IA",
+    "Kansas": "KS",
+    "Kentucky": "KY",
+    "Louisiana": "LA",
+    "Maine": "ME",
+    "Maryland": "MD",
+    "Massachusetts": "MA",
+    "Michigan": "MI",
+    "Minnesota": "MN",
+    "Mississippi": "MS",
+    "Missouri": "MO",
+    "Montana": "MT",
+    "Nebraska": "NE",
+    "Nevada": "NV",
+    "New Hampshire": "NH",
+    "New Jersey": "NJ",
+    "New Mexico": "NM",
+    "New York": "NY",
+    "North Carolina": "NC",
+    "North Dakota": "ND",
+    "Northern Mariana Islands": "MP",
+    "Ohio": "OH",
+    "Oklahoma": "OK",
+    "Oregon": "OR",
+    "Pennsylvania": "PA",
+    "Puerto Rico": "PR",
+    "Rhode Island": "RI",
+    "South Carolina": "SC",
+    "South Dakota": "SD",
+    "Tennessee": "TN",
+    "Texas": "TX",
+    "U.S. Virgin Islands": "VI",
+    "Utah": "UT",
+    "Vermont": "VT",
+    "Virgin Islands": "VI",
+    "Virginia": "VA",
+    "Washington": "WA",
+    "West Virginia": "WV",
+    "Wisconsin": "WI",
+    "Wyoming": "WY",
+}
+
 
 def parse_member(raw: dict) -> dict:
     """
@@ -44,8 +104,10 @@ def parse_member(raw: dict) -> dict:
                 pass
 
     name = raw.get("name") or f"{raw.get('firstName', '')} {raw.get('lastName', '')}".strip()
-    first = raw.get("firstName") or (name.split()[0] if name else "")
-    last = raw.get("lastName") or (name.split()[-1] if name else "")
+    first = raw.get("firstName")
+    last = raw.get("lastName")
+    if not first or not last:
+        first, last = _split_member_name(name)
 
     # FEC candidate ID lives in identifiers section
     identifiers = raw.get("identifiers") or {}
@@ -57,12 +119,33 @@ def parse_member(raw: dict) -> dict:
         "first_name": first,
         "last_name": last,
         "party": party,
-        "state": raw.get("state") or raw.get("stateCode"),
+        "state": _state_code(raw.get("stateCode") or raw.get("state")),
         "district": district,
         "chamber": chamber,
         "is_active": True,
         "fec_candidate_id": fec_id,
     }
+
+
+def _split_member_name(name: str) -> tuple[str, str]:
+    if not name:
+        return "", ""
+    if "," in name:
+        last, first = name.split(",", 1)
+        return first.strip(), last.strip()
+    parts = name.split()
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], parts[-1]
+
+
+def _state_code(value: str | None) -> str | None:
+    if not value:
+        return value
+    value = value.strip()
+    if len(value) == 2:
+        return value.upper()
+    return _STATE_NAME_TO_CODE.get(value, value)
 
 
 def parse_committee_membership(bioguide_id: str, committee: dict, congress: int) -> dict:

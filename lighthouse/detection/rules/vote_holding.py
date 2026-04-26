@@ -7,9 +7,9 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ...detection.industry_map import (
-    asset_name_is_diversified,
     bill_sectors,
     ticker_to_sector,
+    committee_sectors as _committee_sectors,
 )
 
 
@@ -25,13 +25,19 @@ class ConflictCandidate:
     evidence: dict = field(default_factory=dict)
 
 
-def detect(member_votes: list[dict], assets: list[dict], bills: dict) -> list[ConflictCandidate]:
+def detect(member_votes: list[dict], assets: list[dict], bills: dict, committee_memberships: list[dict] | None = None) -> list[ConflictCandidate]:
     """
     member_votes: list of {vote_id, bill_id, position, vote_date, policy_area, subjects_json}
     assets: list of {id, ticker, asset_name, asset_type, value_max, sector, year, owner}
     bills: dict of bill_id → bill record (pre-fetched for efficiency)
     """
     results = []
+
+    # Build the set of sectors regulated by this member's committee assignments
+    committee_regulated: set[str] = set()
+    for cm in (committee_memberships or []):
+        for s in _committee_sectors(cm.get("committee_code", "")):
+            committee_regulated.add(s)
 
     # Build sector index for assets (skip diversified funds and zero-value holdings)
     asset_sectors: dict[str, list[dict]] = {}  # sector → [asset]
@@ -76,18 +82,19 @@ def detect(member_votes: list[dict], assets: list[dict], bills: dict) -> list[Co
         for sector in sectors:
             matched_assets = asset_sectors.get(sector, [])
             for asset in matched_assets:
-
-                # Skip diversified funds
-                if asset_name_is_diversified(asset.get("asset_name") or ""):
+                asset_class = (asset.get("asset_class") or asset.get("asset_type") or "unknown").lower()
+                if asset.get("is_diversified") or asset_class in {
+                    "diversified_fund",
+                    "cash_or_deposit",
+                    "money_market",
+                    "treasury",
+                    "municipal_bond",
+                    "corporate_bond",
+                    "private_business",
+                    "trust",
+                }:
                     continue
 
-                # Compute raw score (0–100)
-                raw_score = _compute_score(
-                    voted_yes=voted_yes,
-                    asset=asset,
-                    bill=bill,
-                    sector=sector,
-                )
                 exact_ticker_match = bool(
                     asset.get("ticker") and asset.get("ticker", "").lower() in bill_text
                 )
@@ -97,6 +104,21 @@ def detect(member_votes: list[dict], assets: list[dict], bills: dict) -> list[Co
                     policy_area,
                     subjects,
                     sector,
+                )
+                committee_match = sector in committee_regulated
+
+                # Sector-only signals with small holdings are too weak to be meaningful
+                sector_only = not (exact_ticker_match or exact_company_match or narrow_industry_match or committee_match)
+                if sector_only and float(asset.get("value_max") or 0) < 50_000:
+                    continue
+
+                # Compute raw score (0–100)
+                raw_score = _compute_score(
+                    voted_yes=voted_yes,
+                    asset=asset,
+                    bill=bill,
+                    sector=sector,
+                    committee_sector_match=committee_match,
                 )
 
                 results.append(ConflictCandidate(
@@ -117,11 +139,13 @@ def detect(member_votes: list[dict], assets: list[dict], bills: dict) -> list[Co
                         "exact_ticker_match": exact_ticker_match,
                         "exact_company_match": exact_company_match,
                         "narrow_industry_match": narrow_industry_match,
+                        "committee_sector_match": committee_match,
                         "sector_match": True,
                         "source_quality": "public_disclosure_with_bill_and_vote_records",
                         "bill_source_url": bill.get("govinfo_url"),
                         "vote_source_url": vote_rec.get("vote_source_url"),
                         "asset_source_url": asset.get("disclosure_source_url"),
+                        "asset_source_file": asset.get("disclosure_raw_file_path"),
                         "asset_parser_source": asset.get("disclosure_source"),
                         "disclosure_id": asset.get("disclosure_id"),
                     },
@@ -130,7 +154,7 @@ def detect(member_votes: list[dict], assets: list[dict], bills: dict) -> list[Co
     return results
 
 
-def _compute_score(voted_yes: bool, asset: dict, bill: dict, sector: str) -> float:
+def _compute_score(voted_yes: bool, asset: dict, bill: dict, sector: str, committee_sector_match: bool = False) -> float:
     val = float(asset.get("value_max") or 0)
 
     # Voting in favor raises signal strength, but broad overlaps should stay conservative.
@@ -155,6 +179,10 @@ def _compute_score(voted_yes: bool, asset: dict, bill: dict, sector: str) -> flo
         size_score = 1.0
 
     score = vote_score + size_score
+
+    # Boost when the vote falls within the member's own committee jurisdiction.
+    if committee_sector_match:
+        score += 15.0
 
     # Company/ticker matches justify stronger scores than sector overlap alone.
     ticker = asset.get("ticker")

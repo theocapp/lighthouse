@@ -1,271 +1,136 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
-{% block heading %}Dashboard{% endblock %}
-{% block subheading %}Overview of public-data ethics signals — {{ stats.total_members }} members tracked{% endblock %}
 
 {% block content %}
 
-<!-- Stat cards -->
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-  {% set cards = [
-    ("Flagged Members", stats.flagged_members, "Medium or high-evidence signals", "text-emerald-700", "bg-emerald-50", "/members?sort=score"),
-    ("Total Signals", stats.total_conflicts, stats.high_confidence ~ " high · " ~ stats.medium_confidence ~ " med · " ~ stats.low_confidence ~ " low", "text-slate-800", "bg-white", "/conflicts"),
-    ("Stock Trades Tracked", stats.total_trades, "STOCK Act disclosures", "text-emerald-700", "bg-emerald-50", "/trades"),
-    ("Assets Disclosed", stats.total_assets, "Financial disclosures", "text-slate-800", "bg-white", "/members?sort=score"),
-  ] %}
-  {% for label, value, sub, color, bg, href in cards %}
-  <a href="{{ href }}" class="surface-link rounded-xl border border-slate-200 {{ bg }} px-5 py-4 shadow-sm block">
-    <div class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1">{{ label }}</div>
-    <div class="text-3xl font-bold {{ color }}">{{ value | int }}</div>
-    <div class="text-xs text-slate-400 mt-1">{{ sub }}</div>
-    <div class="text-xs text-emerald-600 mt-2 font-medium">Open →</div>
-  </a>
-  {% endfor %}
+<!-- Search bar -->
+<div class="card px-5 py-5 mb-8" style="border-left:4px solid #15803d;">
+  <div style="margin-bottom:0.75rem;">
+    <div style="font-family:Georgia,serif; font-size:1.15rem; font-weight:700; color:#166534; margin-bottom:0.2rem;">Find your representatives</div>
+    <div style="font-family:system-ui,sans-serif; font-size:0.8rem; color:#9ca3af;">Search by member name, state, or ZIP code — see current officials, upcoming elections, and conflict signals</div>
+  </div>
+  <form method="get" action="/elections" style="display:flex; gap:0.65rem; flex-wrap:wrap;">
+    <input
+      name="search"
+      type="text"
+      placeholder="Nancy Pelosi · California · 90210 …"
+      class="field-input"
+      style="flex:1; min-width:240px;">
+    <button type="submit" class="btn-primary">Search</button>
+  </form>
 </div>
 
-<!-- Charts + top conflicts -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+<!-- Two-column: signal feed + members -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-  <!-- Conflicts by type chart -->
-  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-    <div class="flex items-center justify-between mb-4">
-      <div class="text-sm font-semibold text-slate-700">Signals by Type</div>
-      <a href="/conflicts" class="text-xs text-emerald-600 hover:underline">Explore</a>
+  <!-- Signal feed (left, 2/3) -->
+  <div class="lg:col-span-2">
+    <div class="section-header">
+      <span class="section-title">Recent Signals</span>
+      <span class="section-sub">sorted by evidence score</span>
+      <a href="/conflicts" class="pill-btn ml-auto" style="font-size:0.7rem;">View all →</a>
     </div>
-    <canvas id="typeChart" height="220"></canvas>
+
+    {% if top_conflicts %}
+      {% for c in top_conflicts %}
+      <a href="/members/{{ c.bioguide_id }}" class="card block mb-3 overflow-hidden hover:shadow-md transition-shadow
+        {% if c.confidence == 'high' %}signal-high{% elif c.confidence == 'medium' %}signal-medium{% else %}signal-low{% endif %}"
+        style="text-decoration:none;">
+        <div class="px-4 py-4">
+          <!-- Member + score row -->
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:0.75rem; margin-bottom:0.5rem;">
+            <div>
+              <span style="font-weight:700; color:#111827; font-size:0.9rem; font-family:system-ui,sans-serif;">{{ c.full_name }}</span>
+              <span class="badge-{{ c.party }}" style="margin-left:0.4rem;">{{ c.party }}</span>
+              <span style="font-size:0.75rem; color:#9ca3af; margin-left:0.4rem; font-family:system-ui,sans-serif;">{{ c.state }} · {{ c.chamber | title }}</span>
+            </div>
+            <span class="conf-{{ c.confidence }}" style="white-space:nowrap; flex-shrink:0;">{{ c.score }}</span>
+          </div>
+          <!-- Signal type -->
+          <div style="margin-bottom:0.4rem;">
+            <span style="font-size:0.7rem; font-weight:700; color:#15803d; text-transform:uppercase; letter-spacing:0.07em; font-family:system-ui,sans-serif;">
+              {{ c.conflict_type | replace("_", " ") | title }}
+            </span>
+          </div>
+          <!-- Full evidence -->
+          <p style="font-size:0.85rem; color:#374151; line-height:1.6; margin:0; font-family:Georgia,serif;">{{ c.evidence_summary or "No evidence summary available." }}</p>
+          {% if c.event_date %}
+          <div style="margin-top:0.5rem; font-size:0.72rem; color:#9ca3af; font-family:system-ui,sans-serif;">{{ c.event_date }}</div>
+          {% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    {% else %}
+    <div class="card px-6 py-12 text-center" style="font-family:system-ui,sans-serif; color:#9ca3af;">
+      <div style="font-size:0.875rem; font-weight:500; margin-bottom:0.25rem;">No signals detected yet</div>
+      <div style="font-size:0.75rem;">Run <code style="background:#f3f4f6; padding:1px 6px; border-radius:4px;">python scripts/detect.py</code> to populate.</div>
+    </div>
+    {% endif %}
   </div>
 
-  <!-- Confidence breakdown donut -->
-  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col">
-    <div class="flex items-center justify-between mb-4">
-      <div class="text-sm font-semibold text-slate-700">Evidence Confidence</div>
-      <a href="/conflicts" class="text-xs text-emerald-600 hover:underline">Inspect</a>
+  <!-- Right sidebar: most flagged + data coverage -->
+  <div class="lg:col-span-1">
+    <div class="section-header">
+      <span class="section-title">Most Flagged</span>
+      <a href="/members" class="pill-btn ml-auto" style="font-size:0.7rem;">All →</a>
     </div>
-    <div class="flex-1 flex items-center justify-center">
-      <canvas id="confChart" width="180" height="180"></canvas>
-    </div>
-    <div class="flex justify-around mt-4 text-xs">
-      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-400 inline-block"></span> High {{ stats.high_confidence }}</span>
-      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span> Medium {{ stats.medium_confidence }}</span>
-      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span> Low {{ stats.low_confidence }}</span>
-    </div>
-  </div>
 
-  <!-- Sector bar chart -->
-  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-    <div class="flex items-center justify-between mb-4">
-      <div class="text-sm font-semibold text-slate-700">Assets by Sector</div>
-      <a href="/members?sort=score" class="text-xs text-emerald-600 hover:underline">Members</a>
-    </div>
-    <canvas id="sectorChart" height="220"></canvas>
-  </div>
-</div>
-
-<!-- Featured members -->
-<div class="bg-white rounded-xl border border-slate-200 shadow-sm mb-6 overflow-hidden">
-  <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-    <span class="font-semibold text-sm text-slate-700">Member Profiles</span>
-    <a href="/members" class="text-xs text-emerald-600 hover:underline">View all members →</a>
-  </div>
-  {% if featured_members %}
-  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-5">
-    {% for m in featured_members %}
-    <a href="/members/{{ m.bioguide_id }}" class="surface-link rounded-xl border border-slate-200 p-4 block">
-      <div class="flex items-start gap-3">
+    {% if featured_members %}
+      {% for m in featured_members %}
+      <a href="/members/{{ m.bioguide_id }}" class="card flex items-center gap-3 px-3 py-3 mb-2 hover:shadow-md transition-shadow block" style="text-decoration:none;">
         <img
           src="{{ m.profile_image_url }}"
           alt="{{ m.full_name }}"
-          class="w-14 h-14 rounded-xl object-cover border border-slate-200"
-          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-        >
-        <div class="w-14 h-14 rounded-xl hidden items-center justify-center text-sm font-bold text-white
+          class="w-9 h-9 rounded-full object-cover border border-gray-100 shrink-0"
+          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="w-9 h-9 rounded-full hidden items-center justify-center text-xs font-bold text-white shrink-0
           {% if m.party == 'D' %}bg-blue-600{% elif m.party == 'R' %}bg-red-600{% else %}bg-slate-500{% endif %}">
-          {{ (m.bioguide_id or '?')[-2:] }}
+          {{ m.full_name[:1] if m.full_name else '?' }}
         </div>
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2 flex-wrap">
-            <div class="font-semibold text-slate-800 truncate">{{ m.full_name }}</div>
-            <span class="px-1.5 py-0.5 rounded text-xs badge-{{ m.party }}">{{ m.party }}</span>
-          </div>
-          <div class="text-xs text-slate-400 mt-1">{{ m.chamber | title }} · {{ m.state }}{% if m.district and m.district != 0 %}-{{ m.district }}{% endif %}</div>
-          <div class="mt-3 grid grid-cols-3 gap-2 text-center">
-            <div class="bg-slate-50 rounded-lg px-2 py-2">
-              <div class="text-sm font-bold text-slate-800">{{ m.conflict_count or 0 }}</div>
-              <div class="text-[10px] text-slate-400 uppercase tracking-wide">Signals</div>
-            </div>
-            <div class="bg-slate-50 rounded-lg px-2 py-2">
-              <div class="text-sm font-bold text-red-600">{{ m.max_score or 0 }}</div>
-              <div class="text-[10px] text-slate-400 uppercase tracking-wide">Max Score</div>
-            </div>
-            <div class="bg-slate-50 rounded-lg px-2 py-2">
-              <div class="text-sm font-bold text-emerald-600">{{ m.trade_count or 0 }}</div>
-              <div class="text-[10px] text-slate-400 uppercase tracking-wide">Trades</div>
-            </div>
-          </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:600; color:#111827; font-size:0.82rem; font-family:system-ui,sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ m.full_name }}</div>
+          <div style="font-size:0.7rem; color:#9ca3af; font-family:system-ui,sans-serif;">{{ m.chamber | title }} · {{ m.state }}</div>
         </div>
+        <div style="flex-shrink:0;">
+          {% if (m.risk_score or 0) >= 53 %}
+          <span class="conf-high">{{ m.risk_score or 0 }}</span>
+          {% elif (m.risk_score or 0) >= 35 %}
+          <span class="conf-medium">{{ m.risk_score or 0 }}</span>
+          {% else %}
+          <span class="conf-low">{{ m.risk_score or 0 }}</span>
+          {% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    {% else %}
+    <div class="card px-5 py-8 text-center" style="font-family:system-ui,sans-serif; color:#9ca3af; font-size:0.85rem;">
+      No scored profiles yet. <a href="/members" style="color:#15803d;">Browse members →</a>
+    </div>
+    {% endif %}
+
+    <!-- Data coverage -->
+    <div style="margin-top:2rem;">
+      <div class="section-header">
+        <span class="section-title">Data Coverage</span>
       </div>
-    </a>
-    {% endfor %}
-  </div>
-  {% else %}
-  <div class="px-5 py-12 text-center text-slate-400 text-sm">
-    Member records exist, but no scored profiles are available yet.
-    <a href="/members" class="text-emerald-600 hover:underline">Browse the member directory</a>.
-  </div>
-  {% endif %}
-</div>
-
-<!-- Top signals table -->
-<div class="bg-white rounded-xl border border-slate-200 shadow-sm mb-6">
-  <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-    <span class="font-semibold text-sm text-slate-700">Top Signals by Score</span>
-    <a href="/conflicts" class="text-xs text-emerald-600 hover:underline">View all →</a>
-  </div>
-  {% if top_conflicts %}
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
-          <th class="px-5 py-3 text-left font-semibold">Signal Score</th>
-          <th class="px-5 py-3 text-left font-semibold">Member</th>
-          <th class="px-5 py-3 text-left font-semibold">Type</th>
-          <th class="px-5 py-3 text-left font-semibold">Evidence</th>
-          <th class="px-5 py-3 text-left font-semibold">Detected</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-50">
-        {% for c in top_conflicts %}
-        <tr class="interactive-row hover:bg-slate-50 transition-colors" onclick="window.location='/members/{{ c.bioguide_id }}'">
-          <td class="px-5 py-3">
-            <span class="inline-block px-2 py-0.5 rounded-full text-xs conf-{{ c.confidence }}">{{ c.score }}</span>
-          </td>
-          <td class="px-5 py-3">
-            <a href="/members/{{ c.bioguide_id }}" class="font-medium text-slate-800 hover:text-emerald-600">{{ c.full_name }}</a>
-            <div class="text-xs text-slate-400">
-              <span class="px-1.5 py-0.5 rounded text-xs badge-{{ c.party }}">{{ c.party }}</span>
-              {{ c.state }} · {{ c.chamber | title }}
-            </div>
-          </td>
-          <td class="px-5 py-3">
-            <span class="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded font-medium">{{ c.conflict_type | replace("_", " ") }}</span>
-          </td>
-          <td class="px-5 py-3 text-slate-600 max-w-xs">
-            <details>
-              <summary class="cursor-pointer list-none text-xs text-slate-500 hover:text-slate-700">
-                {{ (c.evidence_summary or "No evidence summary")[:90] }}{% if c.evidence_summary and c.evidence_summary|length > 90 %}…{% endif %}
-              </summary>
-              <div class="mt-2 text-xs leading-relaxed text-slate-600">{{ c.evidence_summary or "—" }}</div>
-            </details>
-          </td>
-          <td class="px-5 py-3 text-slate-400 text-xs whitespace-nowrap">{{ c.detected_at or "—" }}</td>
-        </tr>
+      <div class="card px-4 py-3" style="font-family:system-ui,sans-serif;">
+        {% set coverage_items = [
+          ("House Votes",        stats.data_coverage.house_votes),
+          ("Senate Votes",       stats.data_coverage.senate_votes),
+          ("House Disclosures",  stats.data_coverage.house_disclosures),
+          ("Senate Disclosures", stats.data_coverage.senate_disclosures),
+          ("FEC Contributions",  stats.data_coverage.fec_contributions),
+        ] %}
+        {% for label, val in coverage_items %}
+        <div style="display:flex; justify-content:space-between; padding:0.3rem 0; {% if not loop.last %}border-bottom:1px solid #f9fafb;{% endif %}">
+          <span style="font-size:0.78rem; color:#6b7280;">{{ label }}</span>
+          <span style="font-size:0.78rem; font-weight:600; color:#166534;">{{ val }}</span>
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="px-5 py-12 text-center text-slate-400 text-sm">
-    No signals detected yet. Run <code class="bg-slate-100 px-1.5 py-0.5 rounded text-xs">python scripts/detect.py</code> to populate.
-  </div>
-  {% endif %}
-</div>
+      </div>
+    </div>
 
-<div class="bg-white rounded-xl border border-slate-200 shadow-sm mb-6 p-5">
-  <div class="text-sm font-semibold text-slate-700 mb-3">Data Coverage</div>
-  <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 text-sm">
-    <div class="bg-slate-50 rounded-lg px-3 py-3"><div class="text-xs text-slate-400 uppercase tracking-wide">House Votes</div><div class="mt-1 font-semibold text-slate-800">{{ stats.data_coverage.house_votes }}</div></div>
-    <div class="bg-slate-50 rounded-lg px-3 py-3"><div class="text-xs text-slate-400 uppercase tracking-wide">Senate Votes</div><div class="mt-1 font-semibold text-slate-800">{{ stats.data_coverage.senate_votes }}</div><div class="text-[11px] text-slate-400">{{ stats.data_coverage.senate_votes_status | replace("_", " ") }}</div></div>
-    <div class="bg-slate-50 rounded-lg px-3 py-3"><div class="text-xs text-slate-400 uppercase tracking-wide">House Disclosures</div><div class="mt-1 font-semibold text-slate-800">{{ stats.data_coverage.house_disclosures }}</div></div>
-    <div class="bg-slate-50 rounded-lg px-3 py-3"><div class="text-xs text-slate-400 uppercase tracking-wide">Senate Disclosures</div><div class="mt-1 font-semibold text-slate-800">{{ stats.data_coverage.senate_disclosures }}</div></div>
-    <div class="bg-slate-50 rounded-lg px-3 py-3"><div class="text-xs text-slate-400 uppercase tracking-wide">FEC Contributions</div><div class="mt-1 font-semibold text-slate-800">{{ stats.data_coverage.fec_contributions }}</div></div>
-    <div class="bg-slate-50 rounded-lg px-3 py-3"><div class="text-xs text-slate-400 uppercase tracking-wide">Ingestion Logs</div><div class="mt-1 font-semibold text-slate-800">{{ stats.data_coverage.last_ingestion_by_source | length }}</div></div>
   </div>
 </div>
 
-<!-- Recent trades -->
-<div class="bg-white rounded-xl border border-slate-200 shadow-sm">
-  <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-    <span class="font-semibold text-sm text-slate-700">Recent STOCK Act Disclosures</span>
-    <a href="/trades" class="text-xs text-emerald-600 hover:underline">View all →</a>
-  </div>
-  {% if recent_trades %}
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
-          <th class="px-5 py-3 text-left font-semibold">Date</th>
-          <th class="px-5 py-3 text-left font-semibold">Member</th>
-          <th class="px-5 py-3 text-left font-semibold">Ticker</th>
-          <th class="px-5 py-3 text-left font-semibold">Type</th>
-          <th class="px-5 py-3 text-left font-semibold">Amount</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-50">
-        {% for t in recent_trades %}
-        <tr class="interactive-row hover:bg-slate-50" onclick="window.location='/members/{{ t.bioguide_id }}'">
-          <td class="px-5 py-2.5 text-slate-500 text-xs">{{ t.transaction_date or "—" }}</td>
-          <td class="px-5 py-2.5">
-            <a href="/members/{{ t.bioguide_id }}" class="font-medium text-slate-800 hover:text-emerald-600 text-xs">{{ t.full_name }}</a>
-            <span class="ml-1 px-1.5 py-0.5 rounded text-xs badge-{{ t.party }}">{{ t.party }}</span>
-          </td>
-          <td class="px-5 py-2.5 font-mono font-bold text-slate-800">{{ t.ticker or "—" }}</td>
-          <td class="px-5 py-2.5">
-            {% if t.transaction_type == "purchase" %}
-              <span class="text-green-600 text-xs font-medium">↑ Purchase</span>
-            {% elif "sale" in (t.transaction_type or "") %}
-              <span class="text-red-500 text-xs font-medium">↓ Sale</span>
-            {% else %}
-              <span class="text-slate-500 text-xs">{{ t.transaction_type or "—" }}</span>
-            {% endif %}
-          </td>
-          <td class="px-5 py-2.5 text-xs text-slate-500">
-            {% if t.amount_min %}${{ "{:,.0f}".format(t.amount_min) }}{% endif %}
-            {% if t.amount_max %} – ${{ "{:,.0f}".format(t.amount_max) }}{% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="px-5 py-12 text-center text-slate-400 text-sm">
-    No trades ingested yet. Run <code class="bg-slate-100 px-1.5 py-0.5 rounded text-xs">python scripts/ingest.py --source stocks</code>.
-  </div>
-  {% endif %}
-</div>
-
-<script>
-const typeData = {{ stats.by_type | tojson }};
-const sectorData = {{ stats.by_sector | tojson }};
-
-// Conflicts by type
-new Chart(document.getElementById('typeChart'), {
-  type: 'bar',
-  data: {
-    labels: Object.keys(typeData).map(k => k.replace(/_/g, ' ')),
-    datasets: [{ data: Object.values(typeData), backgroundColor: '#10b981', borderRadius: 4 }]
-  },
-  options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { ticks: { font: { size: 10 } } } } }
-});
-
-// Confidence donut
-new Chart(document.getElementById('confChart'), {
-  type: 'doughnut',
-  data: {
-    labels: ['High', 'Medium', 'Low'],
-    datasets: [{ data: [{{ stats.high_confidence }}, {{ stats.medium_confidence }}, {{ stats.low_confidence }}], backgroundColor: ['#f87171', '#fbbf24', '#34d399'], borderWidth: 0 }]
-  },
-  options: { plugins: { legend: { display: false } }, cutout: '65%' }
-});
-
-// Sector bar
-new Chart(document.getElementById('sectorChart'), {
-  type: 'bar',
-  data: {
-    labels: Object.keys(sectorData).map(k => k.replace(/_/g, ' ')),
-    datasets: [{ data: Object.values(sectorData), backgroundColor: '#10b981', borderRadius: 4 }]
-  },
-  options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { ticks: { font: { size: 10 } } } } }
-});
-</script>
 {% endblock %}

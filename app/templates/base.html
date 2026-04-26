@@ -3,82 +3,215 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Lighthouse{% endblock %} — Congressional Signal Explorer</title>
+  <title>{% block title %}Lighthouse{% endblock %} — Conflict Intelligence</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <style>
     [x-cloak] { display: none !important; }
-    .nav-link { @apply inline-flex items-center gap-2 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-sm font-medium; }
-    .nav-link.active { @apply bg-emerald-600 text-white; }
-    .surface-link { @apply block transition-all hover:shadow-md hover:-translate-y-0.5; }
-    .interactive-row { @apply cursor-pointer; }
-    .badge-D { @apply bg-blue-100 text-blue-800; }
-    .badge-R { @apply bg-red-100 text-red-800; }
-    .badge-I { @apply bg-slate-100 text-slate-700; }
-    .conf-high { @apply bg-red-100 text-red-700 font-semibold; }
-    .conf-medium { @apply bg-amber-100 text-amber-700 font-semibold; }
-    .conf-low { @apply bg-green-100 text-green-700 font-semibold; }
+
+    body { font-family: Georgia, 'Times New Roman', serif; background: #f7faf7; color: #111827; }
+
+    /* Navigation */
+    .nav-link {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.375rem 0.75rem; border-radius: 0.375rem;
+      color: #94a3b8; font-size: 0.875rem; font-weight: 500;
+      font-family: system-ui, -apple-system, sans-serif;
+      transition: background 0.15s, color 0.15s; text-decoration: none;
+    }
+    .nav-link:hover { background: rgba(0,0,0,0.18); color: white; }
+    .nav-link.active { background: white; color: #166534; }
+
+    /* Utility */
+    .surface-link { display: block; transition: box-shadow 0.15s, transform 0.15s; }
+    .surface-link:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-1px); }
+    .interactive-row { cursor: pointer; }
+
+    /* Party badges */
+    .badge-D { background: #dbeafe; color: #1e40af; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; font-family: system-ui, sans-serif; }
+    .badge-R { background: #fee2e2; color: #991b1b; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; font-family: system-ui, sans-serif; }
+    .badge-I { background: #f3f4f6; color: #374151; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; font-family: system-ui, sans-serif; }
+
+    /* Signal confidence pills */
+    .conf-high   { background: #fee2e2; color: #b91c1c; font-weight: 700; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-family: system-ui, sans-serif; }
+    .conf-medium { background: #fef3c7; color: #92400e; font-weight: 700; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-family: system-ui, sans-serif; }
+    .conf-low    { background: #f3f4f6; color: #4b5563; font-weight: 700; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-family: system-ui, sans-serif; }
+
+    /* Signal card left borders */
+    .signal-high   { border-left: 4px solid #dc2626; }
+    .signal-medium { border-left: 4px solid #f59e0b; }
+    .signal-low    { border-left: 4px solid #9ca3af; }
+
+    /* Section headers — editorial style */
+    .section-header {
+      display: flex; align-items: baseline; gap: 0.75rem;
+      border-bottom: 2px solid #dcfce7;
+      padding-bottom: 0.5rem; margin-bottom: 1.25rem;
+    }
+    .section-title {
+      font-family: Georgia, serif; font-size: 1.1rem; font-weight: 700;
+      color: #166534; letter-spacing: -0.01em;
+    }
+    .section-sub {
+      font-family: system-ui, sans-serif; font-size: 0.75rem; color: #9ca3af;
+    }
+
+    /* Data labels */
+    .data-label {
+      font-family: system-ui, sans-serif; font-size: 0.68rem;
+      text-transform: uppercase; letter-spacing: 0.08em; color: #15803d; font-weight: 600;
+    }
+
+    /* Cards */
+    .card {
+      background: white; border: 1px solid #e5e7eb;
+      border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    /* Form controls */
+    .field-input {
+      border: 1px solid #d1d5db; border-radius: 0.375rem;
+      padding: 0.5rem 0.75rem; font-size: 0.875rem;
+      font-family: system-ui, sans-serif; outline: none; width: 100%;
+      transition: border-color 0.15s, box-shadow 0.15s; background: white;
+    }
+    .field-input:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,0.12); }
+
+    /* Buttons */
+    .btn-primary {
+      background: #15803d; color: white; padding: 0.5rem 1.125rem;
+      border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500;
+      font-family: system-ui, sans-serif; border: none; cursor: pointer;
+      transition: background 0.15s; display: inline-block;
+    }
+    .btn-primary:hover { background: #166534; }
+
+    .btn-ghost {
+      color: #6b7280; padding: 0.5rem 0.75rem;
+      font-size: 0.875rem; font-family: system-ui, sans-serif;
+      background: none; border: none; cursor: pointer; transition: color 0.15s;
+    }
+    .btn-ghost:hover { color: #111827; }
+
+    .pill-btn {
+      display: inline-block; padding: 0.25rem 0.75rem; border-radius: 999px;
+      font-size: 0.75rem; font-weight: 500; font-family: system-ui, sans-serif;
+      border: 1px solid #bbf7d0; color: #166534; background: white;
+      cursor: pointer; transition: all 0.15s; text-decoration: none;
+    }
+    .pill-btn:hover { background: #f0fdf4; border-color: #86efac; }
+    .pill-btn.active { background: #15803d; color: white; border-color: #15803d; }
   </style>
 </head>
-<body class="h-full bg-slate-50 text-slate-900">
+<body class="h-full">
 
-  <header class="sticky top-0 z-40 bg-slate-950/95 backdrop-blur border-b border-slate-800 text-white shadow-sm">
-    <div class="max-w-7xl mx-auto px-6 lg:px-8 py-3">
+  <header class="sticky top-0 z-40 text-white shadow-md" style="background:#166534; border-bottom:1px solid #14532d;">
+    <div class="max-w-6xl mx-auto px-6 lg:px-8 py-3">
       <div class="flex items-center justify-between gap-4 flex-wrap">
-        <a href="/" class="flex items-center gap-3 group">
-          <svg width="38" height="38" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <rect x="15" y="6" width="18" height="34" rx="9" fill="#10B981"/>
-            <path d="M24 6C28.9706 6 33 10.0294 33 15V40H15V15C15 10.0294 19.0294 6 24 6Z" fill="#D1FAE5"/>
-            <path d="M18 13H30" stroke="#064E3B" stroke-width="2.5" stroke-linecap="round"/>
-            <path d="M18 20H30" stroke="#064E3B" stroke-width="2.5" stroke-linecap="round"/>
-            <path d="M18 27H30" stroke="#064E3B" stroke-width="2.5" stroke-linecap="round"/>
-            <path d="M24 40V44" stroke="#D1FAE5" stroke-width="3" stroke-linecap="round"/>
-            <path d="M10 15C10 15 14 11 18 11" stroke="#D1FAE5" stroke-width="2.5" stroke-linecap="round"/>
-            <path d="M38 15C38 15 34 11 30 11" stroke="#D1FAE5" stroke-width="2.5" stroke-linecap="round"/>
+
+        <a href="/" class="flex items-center gap-3" style="text-decoration:none;">
+          <!--
+            Lighthouse logo: two-toned silhouette.
+            White tower (wide flared base, banded tower, lantern room, cap).
+            Light-green beam radiating upper-right from lantern.
+          -->
+          <svg width="36" height="44" viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <!-- Beam (behind tower) -->
+            <path d="M24 12 L36 3 L36 26 Z" fill="#86efac" opacity="0.88"/>
+
+            <!-- Base plinth (very wide) -->
+            <rect x="1" y="41" width="26" height="3" rx="0.75" fill="white"/>
+
+            <!-- Tower skirt — wide trapezoid flaring out at base -->
+            <path d="M3 41 L25 41 L21 27 L7 27 Z" fill="white"/>
+
+            <!-- Tower mid-section -->
+            <rect x="8" y="16" width="13" height="12" fill="white"/>
+
+            <!-- Horizontal band on skirt (banding detail) -->
+            <rect x="7" y="33" width="14" height="1.5" fill="#166534" opacity="0.18"/>
+            <!-- Horizontal band on mid tower -->
+            <rect x="8" y="22" width="13" height="1.5" fill="#166534" opacity="0.18"/>
+
+            <!-- Gallery rail — ledge wider than tower -->
+            <rect x="5.5" y="14" width="18" height="2.5" rx="0.4" fill="white"/>
+
+            <!-- Lantern room body -->
+            <rect x="9" y="7" width="11" height="8" fill="white"/>
+
+            <!-- Lantern cap (trapezoid roof) -->
+            <path d="M7 7 L22 7 L18.5 3 L10.5 3 Z" fill="white"/>
+
+            <!-- Finial -->
+            <rect x="13.5" y="1" width="2.5" height="2.5" rx="0.4" fill="white"/>
           </svg>
           <div>
-            <div class="font-bold text-lg leading-none">Lighthouse</div>
-            <div class="text-emerald-200/80 text-xs mt-0.5">Congressional Ethics Signal Explorer</div>
+            <div style="font-family:Georgia,serif; font-weight:700; font-size:1.15rem; letter-spacing:-0.01em; line-height:1.1; color:white;">Lighthouse</div>
+            <div style="font-size:0.62rem; color:rgba(187,247,208,0.8); margin-top:2px; font-family:system-ui,sans-serif; letter-spacing:0.08em; text-transform:uppercase;">Conflict Intelligence</div>
           </div>
         </a>
 
-        <nav class="flex items-center gap-1 sm:gap-2 flex-wrap">
-          <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-            Dashboard
+        <div class="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+          <nav class="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+            <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+              Dashboard
+            </a>
+            <a href="/members" class="nav-link {% if active_page == 'members' %}active{% endif %}">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              Members
+            </a>
+            <a href="/conflicts" class="nav-link {% if active_page == 'conflicts' %}active{% endif %}">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+              Signals
+            </a>
+            <a href="/trades" class="nav-link {% if active_page == 'trades' %}active{% endif %}">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+              Trades
+            </a>
+            <a href="/elections" class="nav-link {% if active_page == 'elections' %}active{% endif %}">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+              Elections
+            </a>
+            <a href="/api/stats" target="_blank" class="nav-link">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              API
+            </a>
+          </nav>
+
+          <!-- Divider -->
+          <div style="width:1px; height:22px; background:rgba(255,255,255,0.2); margin:0 0.375rem;"></div>
+
+          <!-- Auth buttons -->
+          <a href="/login" style="
+            font-family:system-ui,sans-serif; font-size:0.82rem; font-weight:500;
+            color:rgba(255,255,255,0.85); text-decoration:none;
+            padding:0.35rem 0.75rem; border-radius:0.375rem;
+            transition:background 0.15s;
+          " onmouseover="this.style.background='rgba(0,0,0,0.15)'" onmouseout="this.style.background='transparent'">
+            Sign in
           </a>
-          <a href="/members" class="nav-link {% if active_page == 'members' %}active{% endif %}">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            Members
+          <a href="/register" style="
+            font-family:system-ui,sans-serif; font-size:0.82rem; font-weight:600;
+            background:white; color:#166534; text-decoration:none;
+            padding:0.35rem 0.875rem; border-radius:0.375rem;
+            transition:background 0.15s, color 0.15s;
+          " onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background='white'">
+            Create account
           </a>
-          <a href="/conflicts" class="nav-link {% if active_page == 'conflicts' %}active{% endif %}">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-            Signals
-          </a>
-          <a href="/trades" class="nav-link {% if active_page == 'trades' %}active{% endif %}">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
-            Stock Trades
-          </a>
-          <a href="/api/stats" target="_blank" class="nav-link">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            JSON API
-          </a>
-        </nav>
+        </div>
       </div>
     </div>
   </header>
 
-  <div class="flex min-h-[calc(100vh-72px)] flex-col overflow-x-hidden">
-    <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto w-full">
-      <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Lighthouse does not prove corruption, illegality, intent, or misconduct. It identifies evidence-backed signals that may deserve review.
-      </div>
+  <div class="flex min-h-[calc(100vh-60px)] flex-col overflow-x-hidden">
+    <main class="flex-1 px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto w-full">
       {% block content %}{% endblock %}
     </main>
 
-    <footer class="px-4 sm:px-6 lg:px-8 py-4 border-t border-slate-200 text-xs text-slate-400 text-center">
-      Lighthouse surfaces public-data signals for review. It does not make legal findings or allege misconduct.
+    <footer class="px-4 sm:px-6 lg:px-8 py-5 border-t text-center" style="border-color:#dcfce7; font-family:system-ui,sans-serif; font-size:0.75rem; color:#9ca3af;">
+      Lighthouse surfaces public-data signals for journalistic review. It does not make legal findings or allege misconduct.
     </footer>
   </div>
 

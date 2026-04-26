@@ -27,12 +27,14 @@ def build_report(session: Session, bioguide_id: str) -> Optional[dict]:
     cosponsor_rows = q.get_cosponsored_bills(session, bioguide_id)
     vote_stats = q.get_member_vote_stats(session, bioguide_id)
     recent_votes = q.get_member_recent_votes(session, bioguide_id, limit=25)
+    election_history = q.get_election_history_for_member(session, bioguide_id)
     data_coverage = q.get_data_coverage(session)
 
     high = [c for c in conflicts if c["confidence"] == "high"]
     medium = [c for c in conflicts if c["confidence"] == "medium"]
     low = [c for c in conflicts if c["confidence"] == "low"]
     max_score = max((c["score"] for c in conflicts), default=0.0)
+    risk_score = _compute_risk_score([c["score"] for c in conflicts])
 
     by_type: dict[str, list[dict]] = {}
     for c in conflicts:
@@ -46,8 +48,8 @@ def build_report(session: Session, bioguide_id: str) -> Optional[dict]:
     for a in assets:
         val_max = a.get("value_max") or 0
         val_min = a.get("value_min") or 0
-        sector = a.get("sector") or "other"
-        atype = a.get("asset_type") or "other"
+        sector = a.get("sector") or "unknown"
+        atype = a.get("asset_class") or a.get("asset_type") or "unknown"
         sector_totals[sector] = sector_totals.get(sector, 0) + val_max
         type_totals[atype] = type_totals.get(atype, 0) + val_max
         total_value_min += val_min
@@ -82,7 +84,7 @@ def build_report(session: Session, bioguide_id: str) -> Optional[dict]:
             committee_sectors.add("information_technology")
         if any(k in name for k in ("defense", "armed", "military")):
             committee_sectors.add("industrials")
-    holding_sectors = set(sector_totals.keys()) - {"other", "diversified", "unknown"}
+    holding_sectors = set(sector_totals.keys()) - {"other", "diversified", "unknown", "fixed_income", "cash"}
     overlap_sectors = list(committee_sectors & holding_sectors)
 
     return {
@@ -114,6 +116,7 @@ def build_report(session: Session, bioguide_id: str) -> Optional[dict]:
             "medium_confidence": len(medium),
             "low_confidence": len(low),
             "max_score": round(max_score, 2),
+            "risk_score": risk_score,
             "total_assets": len(assets),
             "total_transactions": len(transactions),
             "committee_count": len(committees),
@@ -168,6 +171,7 @@ def build_report(session: Session, bioguide_id: str) -> Optional[dict]:
             "It surfaces public-data signals that may deserve review."
         ),
         "conflicts": conflicts,
+        "election_history": election_history,
         "conflicts_by_type": by_type,
         "assets": assets,
         "all_assets_sorted": all_assets_sorted,
@@ -178,6 +182,14 @@ def build_report(session: Session, bioguide_id: str) -> Optional[dict]:
             reverse=True,
         )[:50],
     }
+
+
+def _compute_risk_score(scores: list[float]) -> float:
+    if not scores:
+        return 0.0
+    scores = sorted(scores, reverse=True)
+    weights = [1.0, 0.5, 0.25] + [0.1] * max(0, len(scores) - 3)
+    return round(sum(s * w for s, w in zip(scores, weights)), 1)
 
 
 def _initials(full_name: str) -> str:

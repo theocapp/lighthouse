@@ -1,7 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Signals Explorer{% endblock %}
-{% block heading %}Signals Explorer{% endblock %}
-{% block subheading %}{{ conflicts | length }} potential ethics signals across tracked members{% endblock %}
+{% block title %}Signals{% endblock %}
 
 {% block content %}
 <div x-data="{
@@ -11,141 +9,135 @@
   chamber: '{{ chamber or '' }}',
   submit() {
     const p = new URLSearchParams();
-    if (this.search) p.set('search', this.search);
-    if (this.confidence) p.set('confidence', this.confidence);
+    if (this.search)        p.set('search', this.search);
+    if (this.confidence)    p.set('confidence', this.confidence);
     if (this.conflict_type) p.set('type', this.conflict_type);
-    if (this.chamber) p.set('chamber', this.chamber);
+    if (this.chamber)       p.set('chamber', this.chamber);
     window.location.href = '/conflicts?' + p.toString();
   }
 }">
 
-  <!-- Filters -->
-  <div class="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-4 mb-5 flex flex-wrap gap-3 items-end">
-    <div class="flex-1 min-w-48">
-      <label class="text-xs text-slate-500 font-medium block mb-1">Search member</label>
-      <input x-model="search" @keyup.enter="submit()" type="text" placeholder="Name..."
-        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-    </div>
-    <div>
-      <label class="text-xs text-slate-500 font-medium block mb-1">Confidence</label>
-      <select x-model="confidence" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-        <option value="">All</option>
-        <option value="high">High</option>
-        <option value="medium">Medium</option>
-        <option value="low">Low</option>
-      </select>
-    </div>
-    <div>
-      <label class="text-xs text-slate-500 font-medium block mb-1">Type</label>
-      <select x-model="conflict_type" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-        <option value="">All types</option>
-        <option value="vote_holding">Vote + Holding Signal</option>
-        <option value="trade_timing_pre">Trade Before Vote Signal</option>
-        <option value="trade_timing_post">Trade After Vote Signal</option>
-        <option value="sponsorship_holding">Sponsorship + Holding Signal</option>
-        <option value="committee_donor">Committee + Donor Signal</option>
-        <option value="family_holding">Family Holding Signal</option>
-      </select>
-    </div>
-    <div>
-      <label class="text-xs text-slate-500 font-medium block mb-1">Chamber</label>
-      <select x-model="chamber" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-        <option value="">All</option>
-        <option value="house">House</option>
-        <option value="senate">Senate</option>
-      </select>
-    </div>
-    <button @click="submit()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-      Filter
-    </button>
-    {% if search or confidence or conflict_type or chamber %}
-    <a href="/conflicts" class="text-sm text-slate-400 hover:text-slate-600 px-2 py-2">Clear</a>
-    {% endif %}
+  <!-- Page header -->
+  <div style="margin-bottom:1.75rem;">
+    <h1 style="font-family:Georgia,serif; font-size:1.6rem; font-weight:700; color:#166534; letter-spacing:-0.02em; margin:0 0 0.2rem 0;">Signals Explorer</h1>
+    <p style="font-family:system-ui,sans-serif; font-size:0.85rem; color:#9ca3af; margin:0;">{{ conflicts | length }} potential ethics signals across tracked members</p>
   </div>
 
-  <!-- Type breakdown chips -->
-  <div class="flex flex-wrap gap-2 mb-4">
+  <!-- Filters -->
+  <div class="card px-5 py-4 mb-5" style="font-family:system-ui,sans-serif;">
+    <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;">
+      <div style="flex:1; min-width:200px;">
+        <label style="display:block; font-size:0.72rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.3rem;">Search member</label>
+        <input x-model="search" @keyup.enter="submit()" type="text" placeholder="Name…" class="field-input">
+      </div>
+      <div>
+        <label style="display:block; font-size:0.72rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.3rem;">Confidence</label>
+        <select x-model="confidence" class="field-input" style="width:auto;">
+          <option value="">All</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block; font-size:0.72rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.3rem;">Signal type</label>
+        <select x-model="conflict_type" class="field-input" style="width:auto;">
+          <option value="">All types</option>
+          <option value="vote_holding">Vote + Holding</option>
+          <option value="trade_timing_pre">Trade Before Vote</option>
+          <option value="trade_timing_post">Trade After Vote</option>
+          <option value="sponsorship_holding">Sponsorship + Holding</option>
+          <option value="committee_donor">Committee + Donor</option>
+          <option value="family_holding">Family Holding</option>
+          <option value="pattern_holding">Pattern Holding</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block; font-size:0.72rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.3rem;">Chamber</label>
+        <select x-model="chamber" class="field-input" style="width:auto;">
+          <option value="">All</option>
+          <option value="house">House</option>
+          <option value="senate">Senate</option>
+        </select>
+      </div>
+      <button @click="submit()" class="btn-primary">Filter</button>
+      {% if search or confidence or conflict_type or chamber %}
+      <a href="/conflicts" class="btn-ghost">Clear</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Type filter chips -->
+  <div style="display:flex; flex-wrap:wrap; gap:0.375rem; margin-bottom:1.5rem; font-family:system-ui,sans-serif;">
     {% for ctype, count in type_counts.items() %}
     <a href="/conflicts?type={{ ctype }}"
-       class="text-xs px-3 py-1 rounded-full border transition-colors
-         {% if conflict_type == ctype %}bg-indigo-600 text-white border-indigo-600{% else %}bg-white border-slate-200 text-slate-600 hover:border-indigo-400{% endif %}">
-      {{ ctype | replace("_", " ") }}
-      <span class="ml-1 opacity-60">{{ count }}</span>
+       class="pill-btn {% if conflict_type == ctype %}active{% endif %}">
+      {{ ctype | replace("_", " ") | title }}
+      <span style="opacity:0.6; font-weight:400; margin-left:0.2rem;">{{ count }}</span>
     </a>
     {% endfor %}
   </div>
 
-  <!-- Table -->
-  <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-    {% if conflicts %}
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="text-xs text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-200">
-            <th class="px-5 py-3 text-left font-semibold">Signal Score</th>
-            <th class="px-5 py-3 text-left font-semibold">Member</th>
-            <th class="px-5 py-3 text-left font-semibold">Type</th>
-            <th class="px-5 py-3 text-left font-semibold">Evidence</th>
-            <th class="px-5 py-3 text-left font-semibold">Bill / Vote</th>
-            <th class="px-5 py-3 text-left font-semibold">Detected</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-50">
-          {% for c in conflicts %}
-          <tr class="interactive-row hover:bg-slate-50 transition-colors" onclick="window.location='/members/{{ c.bioguide_id }}'">
-            <td class="px-5 py-3">
-              <span class="inline-block px-2 py-0.5 rounded-full text-xs conf-{{ c.confidence }}">{{ c.score }}</span>
-            </td>
-            <td class="px-5 py-3">
-              <a href="/members/{{ c.bioguide_id }}" class="font-medium text-slate-900 hover:text-blue-600">{{ c.full_name }}</a>
-              <div class="flex items-center gap-1 mt-0.5">
-                <span class="px-1.5 py-0.5 rounded text-xs badge-{{ c.party }}">{{ c.party }}</span>
-                <span class="text-xs text-slate-400">{{ c.state }} · {{ c.chamber | title }}</span>
-              </div>
-            </td>
-            <td class="px-5 py-3">
-              <span class="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap">
-                {{ c.conflict_type | replace("_", " ") | replace("committee donor", "committee donor signal") }}
-              </span>
-            </td>
-            <td class="px-5 py-3 text-slate-600 max-w-sm">
-              <details>
-                <summary class="cursor-pointer list-none text-xs leading-relaxed text-slate-500 hover:text-slate-700">
-                  {{ (c.evidence_summary or "No evidence summary")[:110] }}{% if c.evidence_summary and c.evidence_summary|length > 110 %}…{% endif %}
-                </summary>
-                {% set detail = c.detail_json | fromjson if c.detail_json else {} %}
-                <div class="mt-2 text-xs leading-relaxed text-slate-600">{{ c.evidence_summary or "—" }}</div>
-                <div class="mt-2 text-[11px] text-slate-500">Evidence tier: {{ detail.evidence_tier or "—" }}</div>
-                <div class="mt-1 text-[11px] text-slate-500">Confidence reflects evidence quality, not legal certainty.</div>
-              </details>
-            </td>
-            <td class="px-5 py-3 text-xs text-slate-400 whitespace-nowrap">
-              {% if c.bill_id %}<div><a href="/members/{{ c.bioguide_id }}" class="hover:text-blue-600">{{ c.bill_id }}</a></div>{% endif %}
-              {% if c.vote_id %}<div><a href="/members/{{ c.bioguide_id }}" class="hover:text-blue-600">{{ c.vote_id }}</a></div>{% endif %}
-              {% if not c.bill_id and not c.vote_id %}—{% endif %}
-            </td>
-            <td class="px-5 py-3 text-xs text-slate-400 whitespace-nowrap">{{ c.detected_at or "—" }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <div class="px-5 py-3 border-t border-slate-100 text-xs text-slate-400">
-      Showing {{ conflicts | length }} signals · <a href="/api/conflicts" target="_blank" class="text-blue-500 hover:underline">JSON API</a>
-    </div>
-    {% else %}
-    <div class="py-20 text-center text-slate-400">
-      <div class="text-4xl mb-3">✅</div>
-      <div class="text-sm font-medium">No signals match your filters</div>
-      <div class="text-xs mt-1">
-        {% if search or confidence or conflict_type or chamber %}
-          <a href="/conflicts" class="text-blue-500 hover:underline">Clear filters</a>
-        {% else %}
-          Run <code class="bg-slate-100 px-1.5 py-0.5 rounded">python scripts/detect.py</code> to populate.
-        {% endif %}
+  <!-- Signal cards -->
+  {% if conflicts %}
+  <div>
+    {% for c in conflicts %}
+    <a href="/members/{{ c.bioguide_id }}" class="card block mb-3 overflow-hidden hover:shadow-md transition-shadow
+      {% if c.confidence == 'high' %}signal-high{% elif c.confidence == 'medium' %}signal-medium{% else %}signal-low{% endif %}"
+      style="text-decoration:none;">
+      <div style="padding:1rem 1.25rem;">
+
+        <!-- Top row: member + score -->
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:0.5rem; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+            <span style="font-weight:700; color:#111827; font-size:0.9rem; font-family:system-ui,sans-serif;">{{ c.full_name }}</span>
+            <span class="badge-{{ c.party }}">{{ c.party }}</span>
+            <span style="font-size:0.75rem; color:#9ca3af; font-family:system-ui,sans-serif;">{{ c.state }} · {{ c.chamber | title }}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem; flex-shrink:0;">
+            <span class="conf-{{ c.confidence }}">{{ c.score }}</span>
+            <span style="font-size:0.7rem; font-weight:700; color:#15803d; text-transform:uppercase; letter-spacing:0.07em; font-family:system-ui,sans-serif;">
+              {{ c.conflict_type | replace("_", " ") | title }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Evidence — full text, no truncation -->
+        <p style="font-family:Georgia,serif; font-size:0.875rem; color:#1f2937; line-height:1.65; margin:0 0 0.5rem 0;">{{ c.evidence_summary or "No evidence summary available." }}</p>
+
+        <!-- Meta row -->
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; font-family:system-ui,sans-serif; font-size:0.72rem; color:#9ca3af; align-items:center;">
+          {% set detail = c.detail_json | fromjson if c.detail_json else {} %}
+          {% if detail.evidence_tier %}<span style="background:#f3f4f6; padding:1px 6px; border-radius:3px; color:#6b7280;">Tier {{ detail.evidence_tier }}</span>{% endif %}
+          {% if c.bill_id %}<span style="font-family:monospace; background:#f3f4f6; padding:1px 6px; border-radius:3px; color:#374151;">{{ c.bill_id }}</span>{% endif %}
+          {% if c.vote_id %}<span style="font-family:monospace; background:#f3f4f6; padding:1px 6px; border-radius:3px; color:#374151;">{{ c.vote_id }}</span>{% endif %}
+          {% if c.event_date %}<span>{{ c.event_date }}</span>{% elif c.detected_at %}<span>{{ c.detected_at }}</span>{% endif %}
+        </div>
       </div>
+    </a>
+    {% endfor %}
+
+    <div style="padding:0.75rem 0; font-family:system-ui,sans-serif; font-size:0.75rem; color:#9ca3af; text-align:right;">
+      {{ conflicts | length }} signals ·
+      <a href="/api/conflicts" target="_blank" style="color:#15803d; text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">JSON API</a>
     </div>
-    {% endif %}
   </div>
+
+  {% else %}
+  <div class="card px-6 py-16 text-center" style="font-family:system-ui,sans-serif; color:#9ca3af;">
+    <div style="font-size:0.9rem; font-weight:500; margin-bottom:0.25rem;">
+      {% if search or confidence or conflict_type or chamber %}No signals match your filters
+      {% else %}No signals detected yet{% endif %}
+    </div>
+    <div style="font-size:0.78rem; margin-top:0.25rem;">
+      {% if search or confidence or conflict_type or chamber %}
+      <a href="/conflicts" style="color:#15803d;">Clear filters</a>
+      {% else %}
+      Run <code style="background:#f3f4f6; padding:1px 6px; border-radius:4px;">python scripts/detect.py</code>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
 </div>
 {% endblock %}

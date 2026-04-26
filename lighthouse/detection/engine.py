@@ -23,7 +23,7 @@ def run(
     bioguide_id: Optional[str] = None,
     congress: int = 119,
     rule_weights: Optional[dict] = None,
-    trade_window_days: int = 30,
+    trade_window_days: int = 21,
     min_holding_value: float = 1000.0,
     family_discount: float = 0.6,
 ) -> dict[str, int]:
@@ -103,7 +103,7 @@ def _detect_for_member(
 
     candidates: list[ConflictCandidate] = []
 
-    candidates += vote_holding.detect(member_votes, assets, bills)
+    candidates += vote_holding.detect(member_votes, assets, bills, committee_memberships)
     candidates += trade_timing.detect(transactions, all_votes_for_timing, all_bills, trade_window_days)
     candidates += sponsorship.detect(sponsored, cosponsored, assets, bills)
     candidates += committee_donor.detect(committee_memberships, contributions)

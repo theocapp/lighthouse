@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from sqlalchemy import bindparam, create_engine, text
+from sqlalchemy import bindparam, create_engine, inspect, text
 from sqlalchemy.orm import Session
 
 from ..collectors.congress_api import CongressApiCollector
@@ -29,6 +29,7 @@ from ..db.models import (
     RawFecCandidateCommitteeLinkage, RawFecCommittee, RawFecIndividualContribution,
     RawVoteFile, StockTransaction, Vote,
 )
+from ..detection.asset_classifier import apply_asset_classification
 from ..detection.industry_map import bill_sectors, ticker_to_sector
 from ..parsers.bill_parser import (
     extract_billstatus_identity,
@@ -415,6 +416,7 @@ class IngestPipeline:
         from ..db.models import Member
         members = self.session.query(Member).all()
         self.session.query(StockTransaction).delete()
+        seen_transactions: set[tuple] = set()
 
         # Build multi-variant name → bioguide lookup for watcher APIs
         lookup = _build_name_lookup(members)
@@ -423,26 +425,32 @@ class IngestPipeline:
 
         # Try watcher aggregator APIs first (fast but often offline)
         try:
+            house_cache_path = str(self._house_stocks._cache_path("house_stocks:all"))
             for raw in self._house_stocks.get_all_transactions():
                 txn = normalize_house_transaction(raw, lookup)
                 if not txn:
                     continue
+                txn["source_file"] = house_cache_path
                 _enrich_sector(txn)
-                self.session.add(StockTransaction(**txn))
-                count += 1
+                if _register_unique_stock_transaction(txn, seen_transactions):
+                    self.session.add(StockTransaction(**txn))
+                    count += 1
             log.info("House watcher: %d transactions ingested", count)
         except Exception as exc:
             log.warning("House watcher ingestion failed: %s", exc)
 
         senate_count = 0
         try:
+            senate_cache_path = str(self._senate_stocks._cache_path("senate_stocks:all"))
             for raw in self._senate_stocks.get_all_transactions():
                 txn = normalize_senate_transaction(raw, lookup)
                 if not txn:
                     continue
+                txn["source_file"] = senate_cache_path
                 _enrich_sector(txn)
-                self.session.add(StockTransaction(**txn))
-                senate_count += 1
+                if _register_unique_stock_transaction(txn, seen_transactions):
+                    self.session.add(StockTransaction(**txn))
+                    senate_count += 1
             log.info("Senate watcher: %d transactions ingested", senate_count)
             count += senate_count
         except Exception as exc:
@@ -480,10 +488,16 @@ class IngestPipeline:
                     continue
                 try:
                     dest = house_disc.download_filing(filing)
+                    file_hash = _file_sha256(dest)
                     for txn in parse_house_ptr_pdf(dest, bioguide_id):
+                        txn["source_url"] = filing.get("source_url")
+                        txn["source_file"] = str(dest)
+                        txn["source_key"] = str(filing.get("doc_id") or "")
+                        txn["source_hash"] = file_hash
                         _enrich_sector(txn)
-                        self.session.add(StockTransaction(**txn))
-                        ptr_count += 1
+                        if _register_unique_stock_transaction(txn, seen_transactions):
+                            self.session.add(StockTransaction(**txn))
+                            ptr_count += 1
                 except Exception as exc:
                     log.warning(
                         "House PTR parse failed for filing %s: %s",
@@ -503,10 +517,16 @@ class IngestPipeline:
                         if filing.get("document_type") != "ptr":
                             continue
                         dest = house_disc.download_filing(filing)
+                        file_hash = _file_sha256(dest)
                         for txn in parse_house_ptr_pdf(dest, member.bioguide_id):
+                            txn["source_url"] = filing.get("source_url")
+                            txn["source_file"] = str(dest)
+                            txn["source_key"] = str(filing.get("doc_id") or "")
+                            txn["source_hash"] = file_hash
                             _enrich_sector(txn)
-                            self.session.add(StockTransaction(**txn))
-                            ptr_count += 1
+                            if _register_unique_stock_transaction(txn, seen_transactions):
+                                self.session.add(StockTransaction(**txn))
+                                ptr_count += 1
                 except Exception as exc2:
                     log.warning("House PTR per-member failed for %s: %s", member.bioguide_id, exc2)
 
@@ -575,17 +595,13 @@ class IngestPipeline:
                     annual_filings = [f for f in filings if f.get("document_type") == "financial"]
                     for filing in annual_filings[:1]:
                         dest = house_coll.download_filing(filing)
-                        disc_obj = FinancialDisclosure(
-                            bioguide_id=member.bioguide_id,
-                            filer_name=filing.get("name"),
-                            filer_type="member",
-                            filing_type=filing.get("filing_type", "annual"),
+                        disc_obj = FinancialDisclosure(**_financial_disclosure_payload(
+                            member=member,
+                            filing=filing,
                             year=year,
-                            filed_date=_parse_us_date(filing.get("filed_date")),
                             source="house",
-                            source_url=filing.get("source_url"),
                             raw_file_path=str(dest),
-                        )
+                        ))
                         self.session.add(disc_obj)
                         self.session.flush()
                         disc_count += 1
@@ -593,23 +609,20 @@ class IngestPipeline:
                         assets = parse_pdf_disclosure(dest, member.bioguide_id, disc_obj.id)
                         for a in assets:
                             _enrich_asset_sector(a)
-                            self.session.add(Asset(**a))
+                            self.session.add(Asset(**_asset_payload(a)))
                             asset_count += 1
 
                 else:  # senate
                     filings = senate_coll.search_member(member.first_name, member.last_name)
                     for filing in filings[:1]:
                         dest = senate_coll.download_report(filing["report_url"], filing["report_id"])
-                        disc_obj = FinancialDisclosure(
-                            bioguide_id=member.bioguide_id,
-                            filer_name=f"{filing.get('first_name')} {filing.get('last_name')}",
-                            filer_type="member",
-                            filing_type=filing.get("report_type", "annual"),
+                        disc_obj = FinancialDisclosure(**_financial_disclosure_payload(
+                            member=member,
+                            filing=filing,
                             year=year,
-                            filed_date=_parse_us_date(filing.get("filed_date")),
                             source="senate",
                             raw_file_path=str(dest),
-                        )
+                        ))
                         self.session.add(disc_obj)
                         self.session.flush()
                         disc_count += 1
@@ -617,7 +630,7 @@ class IngestPipeline:
                         assets = parse_html_disclosure(dest, member.bioguide_id, disc_obj.id)
                         for a in assets:
                             _enrich_asset_sector(a)
-                            self.session.add(Asset(**a))
+                            self.session.add(Asset(**_asset_payload(a)))
                             asset_count += 1
                     senate_failures = 0
 
@@ -653,11 +666,17 @@ class IngestPipeline:
         members = self.session.query(Member).filter(
             Member.is_active.is_(True),
         ).all()
+        member_ids = [m.bioguide_id for m in members]
+        cycle = self.config.data.fec_cycle
+        self.session.query(CampaignContribution).filter(
+            CampaignContribution.bioguide_id.in_(member_ids),
+            CampaignContribution.election_cycle == cycle,
+        ).delete(synchronize_session=False)
 
         count = 0
+        seen_contributions: set[tuple] = set()
         for member in members:
             try:
-                cycle = self.config.data.fec_cycle
                 seen_committee_ids = set()
                 fec_ids = q.get_member_fec_ids(self.session, member.bioguide_id)
                 if not fec_ids:
@@ -672,8 +691,9 @@ class IngestPipeline:
                         seen_committee_ids.add(cid)
                         for contrib_raw in fec.get_contributions_to_committee(cid, cycle):
                             data = normalize_contribution(contrib_raw, member.bioguide_id)
-                            self.session.add(CampaignContribution(**data))
-                            count += 1
+                            if _register_unique_campaign_contribution(data, seen_contributions):
+                                self.session.add(CampaignContribution(**data))
+                                count += 1
             except Exception as exc:
                 log.warning("FEC ingestion failed for %s: %s", member.bioguide_id, exc)
 
@@ -684,6 +704,7 @@ class IngestPipeline:
         source_url = self.config.fec_warehouse.source_db_url
         cycles = sorted(set(self.config.fec_warehouse.cycles or [self.config.data.fec_cycle]))
         source_engine = create_engine(source_url, echo=False)
+        source_columns = _get_source_table_columns(source_engine, "individual_contributions")
 
         from ..db.models import Member
         members = self.session.query(Member).filter(Member.is_active.is_(True)).all()
@@ -726,37 +747,14 @@ class IngestPipeline:
             WHERE ccl.file_year = :cycle
               AND ccl.cand_id IN :candidate_ids
         """).bindparams(bindparam("candidate_ids", expanding=True))
-
-        contribution_stmt = text("""
-            SELECT
-                ic.cmte_id,
-                ic.name,
-                ic.employer,
-                ic.occupation,
-                ic.state,
-                ic.entity_tp,
-                ic.transaction_tp,
-                ic.transaction_dt,
-                ic.transaction_amt,
-                ic.other_id,
-                ic.image_num,
-                ic.memo_text,
-                ic.sub_id,
-                ic.file_year,
-                cm.cmte_nm
-            FROM individual_contributions ic
-            LEFT JOIN committee_master cm
-              ON cm.cmte_id = ic.cmte_id
-             AND cm.file_year = ic.file_year
-            WHERE ic.file_year = :cycle
-              AND ic.cmte_id IN :committee_ids
-              AND COALESCE(ic.transaction_amt, 0) > 0
-        """).bindparams(bindparam("committee_ids", expanding=True))
+        contribution_stmt = _build_local_fec_contribution_query(source_columns)
 
         imported = 0
+        seen_contributions: set[tuple] = set()
         with source_engine.connect() as conn:
             for cycle in cycles:
-                committee_map: dict[str, tuple[str, str]] = {}
+                committee_map: dict[str, set[tuple[str, str]]] = {}
+                ambiguous_committees: set[str] = set()
                 for chunk in _chunked(candidate_ids, 200):
                     rows = conn.execute(
                         linkage_stmt,
@@ -771,25 +769,67 @@ class IngestPipeline:
                         if not bioguide_id:
                             continue
 
-                        committee_map[committee_id] = (candidate_id, bioguide_id)
+                        committee_map.setdefault(committee_id, set()).add((candidate_id, bioguide_id))
+                        if len(committee_map[committee_id]) > 1:
+                            ambiguous_committees.add(committee_id)
                         self._upsert_raw_fec_committee(row)
                         self._upsert_raw_fec_linkage(row, bioguide_id)
 
                 if not committee_map:
                     continue
 
+                for committee_id in sorted(ambiguous_committees):
+                    log.warning(
+                        "Skipping normalized FEC contributions for ambiguous committee %s in cycle %s; multiple member-linked candidates were found.",
+                        committee_id,
+                        cycle,
+                    )
+
                 for chunk in _chunked(sorted(committee_map.keys()), 200):
                     rows = conn.execute(
                         contribution_stmt,
                         {"cycle": cycle, "committee_ids": chunk},
                     ).mappings()
+                    selected_rows: dict[tuple, dict] = {}
                     for row in rows:
-                        committee_id = row["cmte_id"]
-                        mapping = committee_map.get(committee_id)
-                        if not mapping:
+                        if _is_memo_only_local_fec_row(row):
                             continue
-                        candidate_id, bioguide_id = mapping
+                        dedupe_key = _local_fec_row_dedupe_key(row)
+                        row_dict = dict(row)
+                        existing = selected_rows.get(dedupe_key)
+                        if existing is None or _is_later_local_fec_row(row_dict, existing):
+                            selected_rows[dedupe_key] = row_dict
+
+                    for row in selected_rows.values():
+                        committee_id = row["cmte_id"]
+                        mapping_options = committee_map.get(committee_id) or set()
+                        if not mapping_options:
+                            continue
+                        if len(mapping_options) != 1:
+                            continue
+                        candidate_id, bioguide_id = next(iter(mapping_options))
                         raw_obj = self._upsert_raw_fec_contribution(row, bioguide_id, candidate_id)
+                        contribution = {
+                            "bioguide_id": bioguide_id,
+                            "fec_committee_id": committee_id,
+                            "contributor_name": row["name"],
+                            "contributor_employer": row["employer"],
+                            "contributor_industry": raw_obj.derived_sector,
+                            "amount": float(row["transaction_amt"]) if row["transaction_amt"] else None,
+                            "contribution_date": raw_obj.transaction_date,
+                            "election_cycle": cycle,
+                            "contribution_type": _fec_contribution_type(row["entity_tp"], row["other_id"]),
+                            "source_table": "raw.fec_individual_contributions",
+                            "source_key": f"{raw_obj.source_sub_id}:{raw_obj.file_year}",
+                            "source_url": None,
+                            "source_file": None,
+                            "source_hash": raw_obj.source_record_hash,
+                            "source_sub_id": raw_obj.source_sub_id,
+                            "source_image_num": raw_obj.image_num,
+                            "source_transaction_id": raw_obj.source_transaction_id,
+                        }
+                        if not _register_unique_campaign_contribution(contribution, seen_contributions):
+                            continue
                         self.session.add(CampaignContribution(
                             bioguide_id=bioguide_id,
                             fec_committee_id=committee_id,
@@ -800,6 +840,14 @@ class IngestPipeline:
                             contribution_date=raw_obj.transaction_date,
                             election_cycle=cycle,
                             contribution_type=_fec_contribution_type(row["entity_tp"], row["other_id"]),
+                            source_table="raw.fec_individual_contributions",
+                            source_key=f"{raw_obj.source_sub_id}:{raw_obj.file_year}",
+                            source_url=None,
+                            source_file=None,
+                            source_hash=raw_obj.source_record_hash,
+                            source_sub_id=raw_obj.source_sub_id,
+                            source_image_num=raw_obj.image_num,
+                            source_transaction_id=raw_obj.source_transaction_id,
                         ))
                         imported += 1
 
@@ -896,7 +944,9 @@ class IngestPipeline:
             "amount": row["transaction_amt"],
             "other_id": row["other_id"],
             "image_num": row["image_num"],
+            "memo_code": row.get("memo_cd"),
             "memo_text": row["memo_text"],
+            "source_transaction_id": str(row.get("tran_id")) if row.get("tran_id") is not None else None,
             "derived_sector": derived_sector,
             "source_record_hash": source_hash,
         }
@@ -978,14 +1028,26 @@ def _enrich_sector(txn: dict):
 
 
 def _enrich_asset_sector(asset: dict):
-    if asset.get("sector"):
-        return
-    ticker = (asset.get("ticker") or "").upper()
-    sector = None
-    if ticker:
-        sector = ticker_to_sector(ticker)
-    if sector and sector != "unknown":
-        asset["sector"] = sector
+    apply_asset_classification(asset)
+
+
+def _asset_payload(asset: dict) -> dict:
+    allowed = {
+        "disclosure_id",
+        "bioguide_id",
+        "asset_name",
+        "asset_type",
+        "ticker",
+        "value_min",
+        "value_max",
+        "income_min",
+        "income_max",
+        "owner",
+        "year",
+        "industry_code",
+        "sector",
+    }
+    return {key: value for key, value in asset.items() if key in allowed}
 
 
 def _parse_us_date(raw: Optional[str]):
@@ -1006,6 +1068,202 @@ def _parse_fec_transaction_date(raw: Optional[str]):
     try:
         return datetime.strptime(value, "%m%d%Y").date()
     except ValueError:
+        return None
+
+
+def _get_source_table_columns(engine, table_name: str) -> set[str]:
+    try:
+        return {col["name"] for col in inspect(engine).get_columns(table_name)}
+    except Exception:
+        return set()
+
+
+def _build_local_fec_contribution_query(source_columns: set[str]):
+    has_memo_cd = "memo_cd" in source_columns
+    has_tran_id = "tran_id" in source_columns
+
+    memo_cd_select = "ic.memo_cd" if has_memo_cd else "NULL AS memo_cd"
+    tran_id_select = "ic.tran_id" if has_tran_id else "NULL AS tran_id"
+    memo_cd_filter = "AND COALESCE(ic.memo_cd, '') <> 'X'" if has_memo_cd else ""
+    partition_key = (
+        "COALESCE(NULLIF(TRIM(CAST(ic.tran_id AS text)), ''), "
+        "CONCAT_WS('|', COALESCE(ic.cmte_id, ''), COALESCE(ic.name, ''), COALESCE(ic.employer, ''), "
+        "COALESCE(CAST(ic.transaction_amt AS text), ''), COALESCE(CAST(ic.transaction_dt AS text), ''), "
+        "COALESCE(ic.image_num, ''), COALESCE(ic.other_id, ''), COALESCE(ic.transaction_tp, '')))"
+        if has_tran_id else
+        "CONCAT_WS('|', COALESCE(ic.cmte_id, ''), COALESCE(ic.name, ''), COALESCE(ic.employer, ''), "
+        "COALESCE(CAST(ic.transaction_amt AS text), ''), COALESCE(CAST(ic.transaction_dt AS text), ''), "
+        "COALESCE(ic.image_num, ''), COALESCE(ic.other_id, ''), COALESCE(ic.transaction_tp, ''))"
+    )
+
+    # Exclude memo-only rows where the source table explicitly marks them as memo entries
+    # or where the FEC transaction code itself is a memo code (e.g. *J rows). When
+    # transaction IDs exist, keep only the latest row per committee/transaction key using
+    # SUB_ID as the safest monotonic tiebreaker available in the loaded warehouse.
+    sql = f"""
+        WITH ranked AS (
+            SELECT
+                ic.cmte_id,
+                ic.name,
+                ic.employer,
+                ic.occupation,
+                ic.state,
+                ic.entity_tp,
+                ic.transaction_tp,
+                ic.transaction_dt,
+                ic.transaction_amt,
+                ic.other_id,
+                ic.image_num,
+                ic.memo_text,
+                ic.sub_id,
+                ic.file_year,
+                {memo_cd_select},
+                {tran_id_select},
+                cm.cmte_nm,
+                ROW_NUMBER() OVER (
+                    PARTITION BY ic.file_year, ic.cmte_id, {partition_key}
+                    ORDER BY ic.sub_id DESC
+                ) AS row_num
+            FROM individual_contributions ic
+            LEFT JOIN committee_master cm
+              ON cm.cmte_id = ic.cmte_id
+             AND cm.file_year = ic.file_year
+            WHERE ic.file_year = :cycle
+              AND ic.cmte_id IN :committee_ids
+              AND COALESCE(ic.transaction_amt, 0) > 0
+              AND COALESCE(ic.transaction_tp, '') NOT LIKE '%J'
+              {memo_cd_filter}
+        )
+        SELECT
+            cmte_id,
+            name,
+            employer,
+            occupation,
+            state,
+            entity_tp,
+            transaction_tp,
+            transaction_dt,
+            transaction_amt,
+            other_id,
+            image_num,
+            memo_text,
+            sub_id,
+            file_year,
+            memo_cd,
+            tran_id,
+            cmte_nm
+        FROM ranked
+        WHERE row_num = 1
+    """
+    return text(sql).bindparams(bindparam("committee_ids", expanding=True))
+
+
+def _is_memo_only_local_fec_row(row: dict) -> bool:
+    memo_cd = str(row.get("memo_cd") or "").strip().upper()
+    transaction_tp = str(row.get("transaction_tp") or "").strip().upper()
+    return memo_cd == "X" or transaction_tp.endswith("J")
+
+
+def _local_fec_row_dedupe_key(row: dict) -> tuple:
+    tran_id = str(row.get("tran_id") or "").strip()
+    if tran_id:
+        return ("tran_id", str(row.get("file_year") or ""), str(row.get("cmte_id") or ""), tran_id)
+    return (
+        "fingerprint",
+        str(row.get("file_year") or ""),
+        str(row.get("cmte_id") or ""),
+        " ".join(str(row.get("name") or "").split()).lower(),
+        " ".join(str(row.get("employer") or "").split()).lower(),
+        str(row.get("transaction_amt") or ""),
+        str(row.get("transaction_dt") or ""),
+        str(row.get("image_num") or ""),
+        str(row.get("other_id") or ""),
+        str(row.get("transaction_tp") or ""),
+    )
+
+
+def _is_later_local_fec_row(candidate: dict, current: dict) -> bool:
+    try:
+        candidate_sub_id = int(str(candidate.get("sub_id") or 0))
+    except ValueError:
+        candidate_sub_id = 0
+    try:
+        current_sub_id = int(str(current.get("sub_id") or 0))
+    except ValueError:
+        current_sub_id = 0
+    return candidate_sub_id > current_sub_id
+
+
+def _financial_disclosure_payload(*, member, filing: dict, year: int, source: str, raw_file_path: str) -> dict:
+    if source == "house":
+        filer_name = filing.get("name")
+        filing_type = filing.get("filing_type", "annual")
+        source_url = filing.get("source_url")
+    else:
+        filer_name = f"{filing.get('first_name')} {filing.get('last_name')}".strip()
+        filing_type = filing.get("report_type", "annual")
+        source_url = filing.get("report_url")
+
+    return {
+        "bioguide_id": member.bioguide_id,
+        "filer_name": filer_name,
+        "filer_type": "member",
+        "filing_type": filing_type,
+        "year": year,
+        "filed_date": _parse_us_date(filing.get("filed_date")),
+        "source": source,
+        "source_url": source_url,
+        "raw_file_path": raw_file_path,
+    }
+
+
+def _stock_transaction_dedup_key(txn: dict) -> tuple:
+    return (
+        txn.get("bioguide_id"),
+        txn.get("transaction_date"),
+        txn.get("disclosure_date"),
+        (txn.get("ticker") or "").upper(),
+        " ".join((txn.get("asset_name") or "").split()).lower(),
+        txn.get("transaction_type"),
+        txn.get("amount_min"),
+        txn.get("amount_max"),
+        txn.get("owner"),
+    )
+
+
+def _register_unique_stock_transaction(txn: dict, seen: set[tuple]) -> bool:
+    key = _stock_transaction_dedup_key(txn)
+    if key in seen:
+        return False
+    seen.add(key)
+    return True
+
+
+def _campaign_contribution_dedup_key(contribution: dict) -> tuple:
+    return (
+        contribution.get("bioguide_id"),
+        contribution.get("fec_committee_id"),
+        " ".join((contribution.get("contributor_name") or "").split()).lower(),
+        " ".join((contribution.get("contributor_employer") or "").split()).lower(),
+        contribution.get("amount"),
+        str(contribution.get("contribution_date") or ""),
+        contribution.get("election_cycle"),
+        contribution.get("contribution_type"),
+    )
+
+
+def _register_unique_campaign_contribution(contribution: dict, seen: set[tuple]) -> bool:
+    key = _campaign_contribution_dedup_key(contribution)
+    if key in seen:
+        return False
+    seen.add(key)
+    return True
+
+
+def _file_sha256(path: Path) -> Optional[str]:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except Exception:
         return None
 
 

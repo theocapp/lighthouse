@@ -19,6 +19,7 @@ class ApiKeys:
     congress_gov: str = ""
     fec: str = ""
     financial_modeling_prep: str = ""
+    google_civic: str = ""
 
 
 @dataclass
@@ -120,6 +121,8 @@ def load_config(path: Optional[str] = None) -> Config:
         env_overrides.setdefault("api_keys", {})["congress_gov"] = key
     if key := os.environ.get("FEC_API_KEY"):
         env_overrides.setdefault("api_keys", {})["fec"] = key
+    if key := os.environ.get("GOOGLE_CIVIC_API_KEY"):
+        env_overrides.setdefault("api_keys", {})["google_civic"] = key
     if url := os.environ.get("DATABASE_URL"):
         env_overrides.setdefault("database", {})["url"] = url
 

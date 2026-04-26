@@ -178,6 +178,10 @@ TICKER_TO_SECTOR: dict[str, str] = {
     # Broad market / index funds → marked as diversified (discount applied in scorer)
     "SPY": "diversified", "QQQ": "diversified", "IVV": "diversified", "VTI": "diversified",
     "VOO": "diversified", "VEA": "diversified", "AGG": "diversified", "BND": "diversified",
+    "VT": "diversified", "SCHB": "diversified", "SPLG": "diversified", "ITOT": "diversified",
+    "IWM": "diversified", "VO": "diversified", "VB": "diversified", "IJH": "diversified",
+    "IJR": "diversified", "VXUS": "diversified", "BNDX": "diversified", "SCHX": "diversified",
+    "SCHV": "diversified", "SCHF": "diversified", "VUG": "diversified", "VTV": "diversified",
 }
 
 # Committee code → regulated sectors (used by committee_donor rule)
@@ -224,9 +228,9 @@ COMMITTEE_TO_SECTORS: dict[str, list[str]] = {
 
 # Common mutual fund / ETF name patterns → diversified flag
 DIVERSIFIED_PATTERNS = [
-    "index fund", "etf", "s&p 500", "total market", "bond fund",
-    "treasury", "money market", "target date", "vanguard", "fidelity",
-    "iShares", "schwab", "spdr", "vwiax", "vtsax", "fxaix",
+    "index fund", "etf", "exchange traded fund", "s&p 500", "total market", "bond fund",
+    "treasury fund", "money market", "target date", "mutual fund", "vanguard", "fidelity",
+    "ishares", "schwab", "spdr", "blackrock", "vwiax", "vtsax", "fxaix",
 ]
 
 

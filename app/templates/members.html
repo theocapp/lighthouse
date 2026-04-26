@@ -1,7 +1,5 @@
 {% extends "base.html" %}
 {% block title %}Members{% endblock %}
-{% block heading %}Congress Members{% endblock %}
-{% block subheading %}{{ members | length }} members · sorted by signal score{% endblock %}
 
 {% block content %}
 <div x-data="{
@@ -9,135 +7,194 @@
   chamber: '{{ chamber or '' }}',
   party: '{{ party or '' }}',
   sort: '{{ sort or 'score' }}',
+  view: 'table',
   submit() {
     const p = new URLSearchParams();
-    if (this.search) p.set('search', this.search);
+    if (this.search)  p.set('search',  this.search);
     if (this.chamber) p.set('chamber', this.chamber);
-    if (this.party) p.set('party', this.party);
-    if (this.sort) p.set('sort', this.sort);
+    if (this.party)   p.set('party',   this.party);
+    if (this.sort)    p.set('sort',    this.sort);
     window.location.href = '/members?' + p.toString();
   }
 }">
 
-  <!-- Filters bar -->
-  <div class="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-4 mb-5 flex flex-wrap gap-3 items-end">
-    <div class="flex-1 min-w-48">
-      <label class="text-xs text-slate-500 font-medium block mb-1">Search name</label>
-      <input x-model="search" @keyup.enter="submit()" type="text" placeholder="e.g. Pelosi"
-        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+  <!-- Page header -->
+  <div style="margin-bottom:1.75rem;">
+    <h1 style="font-family:Georgia,serif; font-size:1.6rem; font-weight:700; color:#166534; letter-spacing:-0.02em; margin:0 0 0.2rem 0;">Members</h1>
+    <p style="font-family:system-ui,sans-serif; font-size:0.85rem; color:#9ca3af; margin:0;">{{ members | length }} members tracked · sorted by signal score</p>
+  </div>
+
+  <!-- Filters -->
+  <div class="card px-5 py-4 mb-5" style="font-family:system-ui,sans-serif;">
+    <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;">
+      <div style="flex:1; min-width:200px;">
+        <label style="display:block; font-size:0.72rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.3rem;">Search</label>
+        <input x-model="search" @keyup.enter="submit()" type="text" placeholder="Name…" class="field-input">
+      </div>
+      <div>
+        <label style="display:block; font-size:0.72rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.3rem;">Chamber</label>
+        <select x-model="chamber" class="field-input" style="width:auto;">
+          <option value="">All</option>
+          <option value="house">House</option>
+          <option value="senate">Senate</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block; font-size:0.72rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.3rem;">Party</label>
+        <select x-model="party" class="field-input" style="width:auto;">
+          <option value="">All</option>
+          <option value="D">Democrat</option>
+          <option value="R">Republican</option>
+          <option value="I">Independent</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block; font-size:0.72rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.3rem;">Sort</label>
+        <select x-model="sort" class="field-input" style="width:auto;">
+          <option value="score">Signal score</option>
+          <option value="conflicts">Signal count</option>
+          <option value="name">Name</option>
+        </select>
+      </div>
+      <button @click="submit()" class="btn-primary">Filter</button>
     </div>
-    <div>
-      <label class="text-xs text-slate-500 font-medium block mb-1">Chamber</label>
-      <select x-model="chamber" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-        <option value="">All</option>
-        <option value="house">House</option>
-        <option value="senate">Senate</option>
-      </select>
-    </div>
-    <div>
-      <label class="text-xs text-slate-500 font-medium block mb-1">Party</label>
-      <select x-model="party" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-        <option value="">All</option>
-        <option value="D">Democrat</option>
-        <option value="R">Republican</option>
-        <option value="I">Independent</option>
-      </select>
-    </div>
-    <div>
-      <label class="text-xs text-slate-500 font-medium block mb-1">Sort by</label>
-      <select x-model="sort" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-        <option value="score">Signal score</option>
-        <option value="conflicts">Signal count</option>
-        <option value="name">Name</option>
-      </select>
-    </div>
-    <button @click="submit()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-      Filter
+  </div>
+
+  <!-- View toggle -->
+  <div style="display:flex; gap:0.5rem; margin-bottom:1.25rem; font-family:system-ui,sans-serif;">
+    <button @click="view='table'"
+      :class="view === 'table' ? 'btn-secondary active' : 'btn-secondary'">
+      <span style="display:inline-flex; align-items:center; gap:0.35rem;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 6h18M3 14h18M3 18h18"/></svg>
+        Table
+      </span>
+    </button>
+    <button @click="view='heatmap'"
+      :class="view === 'heatmap' ? 'btn-secondary active' : 'btn-secondary'">
+      <span style="display:inline-flex; align-items:center; gap:0.35rem;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        Heatmap
+      </span>
     </button>
   </div>
 
-  <!-- Table -->
-  <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+  <!-- TABLE VIEW -->
+  <div x-show="view === 'table'">
     {% if members %}
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="text-xs text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-200">
-            <th class="px-5 py-3 text-left font-semibold">Member</th>
-            <th class="px-5 py-3 text-left font-semibold">Party</th>
-            <th class="px-5 py-3 text-left font-semibold">Chamber</th>
-            <th class="px-5 py-3 text-left font-semibold">State</th>
-            <th class="px-5 py-3 text-right font-semibold">Signals</th>
-            <th class="px-5 py-3 text-right font-semibold">High ⚠</th>
-            <th class="px-5 py-3 text-right font-semibold">Max Score</th>
-            <th class="px-5 py-3 text-left font-semibold"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-50">
-          {% for m in members %}
-          <tr class="hover:bg-slate-50 transition-colors">
-            <td class="px-5 py-3">
-              <div class="flex items-center gap-3 min-w-0">
-                <img
-                  src="{{ m.profile_image_url }}"
-                  alt="{{ m.full_name }}"
-                  class="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
-                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-                >
-                <div
-                  class="w-10 h-10 rounded-full hidden items-center justify-center text-xs font-bold text-white shrink-0 {% if m.party == 'D' %}bg-blue-600{% elif m.party == 'R' %}bg-red-600{% else %}bg-slate-500{% endif %}">
-                  {{ m.full_name[:1] if m.full_name else '?' }}
+    <div class="card overflow-hidden">
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-family:system-ui,sans-serif; font-size:0.83rem;">
+          <thead>
+            <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
+              <th style="padding:0.625rem 1.25rem; text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Member</th>
+              <th style="padding:0.625rem 1rem; text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Chamber</th>
+              <th style="padding:0.625rem 1rem; text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">State</th>
+              <th style="padding:0.625rem 1rem; text-align:right; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Signals</th>
+              <th style="padding:0.625rem 1rem; text-align:right; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">High</th>
+              <th style="padding:0.625rem 1rem; text-align:right; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Score</th>
+              <th style="padding:0.625rem 1rem;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in members %}
+            <tr class="interactive-row" onclick="window.location='/members/{{ m.bioguide_id }}'"
+              style="border-bottom:1px solid #f9fafb; transition:background 0.1s;"
+              onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background=''">
+              <td style="padding:0.75rem 1.25rem;">
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                  <img
+                    src="{{ m.profile_image_url }}"
+                    alt="{{ m.full_name }}"
+                    style="width:36px; height:36px; border-radius:50%; object-fit:cover; border:1px solid #e5e7eb; flex-shrink:0;"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                  <div style="width:36px; height:36px; border-radius:50%; display:none; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; color:white; flex-shrink:0;
+                    {% if m.party == 'D' %}background:#2563eb;{% elif m.party == 'R' %}background:#dc2626;{% else %}background:#64748b;{% endif %}">
+                    {{ m.full_name[:1] if m.full_name else '?' }}
+                  </div>
+                  <div>
+                    <a href="/members/{{ m.bioguide_id }}" style="font-weight:600; color:#111827; text-decoration:none; font-size:0.85rem; display:block;" onmouseover="this.style.color='#15803d'" onmouseout="this.style.color='#111827'">{{ m.full_name }}</a>
+                    <span class="badge-{{ m.party }}">{{ m.party }}</span>
+                  </div>
                 </div>
-                <div class="min-w-0">
-                  <a href="/members/{{ m.bioguide_id }}" class="font-medium text-slate-900 hover:text-blue-600 truncate block">{{ m.full_name }}</a>
-                  <div class="text-xs text-slate-400 font-mono">{{ m.bioguide_id }}</div>
-                </div>
-              </div>
-            </td>
-            <td class="px-5 py-3">
-              <span class="px-2 py-0.5 rounded text-xs font-semibold badge-{{ m.party }}">{{ m.party }}</span>
-            </td>
-            <td class="px-5 py-3 text-slate-600 capitalize">{{ m.chamber }}</td>
-            <td class="px-5 py-3 text-slate-600">{{ m.state }}{% if m.district %}-{{ m.district }}{% endif %}</td>
-            <td class="px-5 py-3 text-right">
-              {% if m.conflict_count > 0 %}
-                <span class="font-semibold text-slate-700">{{ m.conflict_count }}</span>
-              {% else %}
-                <span class="text-slate-300">0</span>
-              {% endif %}
-            </td>
-            <td class="px-5 py-3 text-right">
-              {% if m.high_count > 0 %}
-                <span class="font-bold text-red-600">{{ m.high_count }}</span>
-              {% else %}
-                <span class="text-slate-300">—</span>
-              {% endif %}
-            </td>
-            <td class="px-5 py-3 text-right">
-              {% if m.max_score > 0 %}
-                <span class="inline-block px-2 py-0.5 rounded-full text-xs
-                  {% if m.max_score >= 70 %}conf-high{% elif m.max_score >= 40 %}conf-medium{% else %}conf-low{% endif %}">
-                  {{ m.max_score }}
-                </span>
-              {% else %}
-                <span class="text-slate-300 text-xs">—</span>
-              {% endif %}
-            </td>
-            <td class="px-5 py-3">
-              <a href="/members/{{ m.bioguide_id }}" class="text-xs text-blue-500 hover:underline whitespace-nowrap">View report →</a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+              </td>
+              <td style="padding:0.75rem 1rem; color:#6b7280; text-transform:capitalize;">{{ m.chamber }}</td>
+              <td style="padding:0.75rem 1rem; color:#6b7280;">{{ m.state }}{% if m.district %}-{{ m.district }}{% endif %}</td>
+              <td style="padding:0.75rem 1rem; text-align:right;">
+                {% if m.conflict_count > 0 %}
+                  <span style="font-weight:600; color:#374151;">{{ m.conflict_count }}</span>
+                {% else %}
+                  <span style="color:#d1d5db;">0</span>
+                {% endif %}
+              </td>
+              <td style="padding:0.75rem 1rem; text-align:right;">
+                {% if m.high_count > 0 %}
+                  <span style="font-weight:700; color:#b91c1c;">{{ m.high_count }}</span>
+                {% else %}
+                  <span style="color:#d1d5db;">—</span>
+                {% endif %}
+              </td>
+              <td style="padding:0.75rem 1rem; text-align:right;">
+                {% if m.risk_score > 0 %}
+                  {% if m.risk_score >= 53 %}
+                  <span class="conf-high">{{ m.risk_score }}</span>
+                  {% elif m.risk_score >= 35 %}
+                  <span class="conf-medium">{{ m.risk_score }}</span>
+                  {% else %}
+                  <span class="conf-low">{{ m.risk_score }}</span>
+                  {% endif %}
+                {% else %}
+                  <span style="color:#d1d5db; font-size:0.75rem;">—</span>
+                {% endif %}
+              </td>
+              <td style="padding:0.75rem 1rem;">
+                <a href="/members/{{ m.bioguide_id }}" style="font-size:0.75rem; color:#15803d; text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">View →</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
     {% else %}
-    <div class="py-20 text-center text-slate-400">
-      <div class="text-4xl mb-3">🔍</div>
-      <div class="text-sm font-medium">No members found</div>
-      <div class="text-xs mt-1">Try adjusting your filters or run ingestion first.</div>
+    <div class="card py-16 text-center" style="font-family:system-ui,sans-serif; color:#9ca3af;">
+      <div style="font-size:0.9rem; font-weight:500; margin-bottom:0.25rem;">No members found</div>
+      <div style="font-size:0.78rem;">Try adjusting your filters or run ingestion first.</div>
     </div>
     {% endif %}
   </div>
+
+  <!-- HEATMAP VIEW -->
+  <div x-show="view === 'heatmap'" x-cloak style="font-family:system-ui,sans-serif;">
+    <div style="font-size:0.78rem; color:#9ca3af; margin-bottom:1.25rem; display:flex; gap:1rem; flex-wrap:wrap;">
+      <span style="color:#b91c1c; font-weight:600;">■ High ≥53</span>
+      <span style="color:#92400e; font-weight:600;">■ Medium ≥35</span>
+      <span style="color:#374151; font-weight:600;">■ Low &gt;0</span>
+      <span style="color:#9ca3af;">■ None</span>
+    </div>
+
+    {% for chamber_name in ['Senate', 'House'] %}
+    <div style="margin-bottom:2.5rem;">
+      <h2 style="font-family:Georgia,serif; font-size:1.05rem; font-weight:700; color:#166534; margin:0 0 0.75rem 0; padding-bottom:0.4rem; border-bottom:2px solid #dcfce7;">{{ chamber_name }}</h2>
+      <div style="display:flex; flex-wrap:wrap; gap:0.35rem;">
+        {% for m in members %}
+        {% if m.chamber | title == chamber_name %}
+        <a href="/members/{{ m.bioguide_id }}"
+          title="{{ m.full_name }} — score {{ m.risk_score or 0 }}"
+          style="display:inline-block; padding:0.3rem 0.6rem; border-radius:0.3rem; font-size:0.72rem; font-weight:600; text-decoration:none; min-width:80px; text-align:center; transition:opacity 0.12s;
+            {% if (m.risk_score or 0) >= 53 %}background:#dc2626; color:white;
+            {% elif (m.risk_score or 0) >= 35 %}background:#f59e0b; color:white;
+            {% elif (m.risk_score or 0) > 0 %}background:#374151; color:white;
+            {% else %}background:#e5e7eb; color:#6b7280;{% endif %}"
+          onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='1'">
+          {{ m.full_name.split(' ')[-1] }}
+          <div style="font-size:0.62rem; font-weight:400; opacity:0.8; margin-top:1px;">{{ m.risk_score or 0 }}</div>
+        </a>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
 </div>
 {% endblock %}

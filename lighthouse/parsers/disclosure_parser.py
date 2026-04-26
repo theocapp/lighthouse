@@ -11,22 +11,24 @@ from bs4 import BeautifulSoup
 
 
 _ASSET_TYPE_MAP = {
-    "stock": "stock",
-    "common stock": "stock",
-    "preferred stock": "stock",
+    "stock": "public_equity",
+    "common stock": "public_equity",
+    "preferred stock": "public_equity",
     "bond": "bond",
     "treasury": "bond",
     "note": "bond",
     "mutual fund": "fund",
     "etf": "fund",
     "exchange traded": "fund",
-    "partnership": "other",
+    "partnership": "private_business",
+    "llc": "private_business",
     "real estate": "real_estate",
     "property": "real_estate",
-    "trust": "other",
-    "ira": "other",
-    "retirement": "other",
-    "cash": "other",
+    "trust": "trust",
+    "ira": "retirement",
+    "retirement": "retirement",
+    "cash": "cash_or_deposit",
+    "money market": "money_market",
 }
 
 # STOCK Act dollar range bands → (min, max)
@@ -69,7 +71,7 @@ def _classify_asset_type(name: str) -> str:
     for keyword, asset_type in _ASSET_TYPE_MAP.items():
         if keyword in lower:
             return asset_type
-    return "other"
+    return "unknown"
 
 
 def _extract_ticker(name: str) -> Optional[str]:

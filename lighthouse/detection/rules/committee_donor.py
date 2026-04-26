@@ -52,6 +52,14 @@ def detect(
                         "sector_match": True,
                         "source_quality": "public_fec_records_with_committee_metadata",
                         "fec_committee_id": contrib.get("fec_committee_id"),
+                        "contribution_source_table": contrib.get("source_table"),
+                        "contribution_source_key": contrib.get("source_key"),
+                        "contribution_source_url": contrib.get("source_url"),
+                        "contribution_source_file": contrib.get("source_file"),
+                        "contribution_source_hash": contrib.get("source_hash"),
+                        "contribution_source_sub_id": contrib.get("source_sub_id"),
+                        "contribution_source_image_num": contrib.get("source_image_num"),
+                        "contribution_source_transaction_id": contrib.get("source_transaction_id"),
                     },
                 ))
                 break  # one conflict per contribution
@@ -81,7 +89,7 @@ def _industry_matches_sector(industry: str, sector: str) -> bool:
 
 
 def _compute_score(contrib: dict, committees: list[dict]) -> float:
-    score = 18.0
+    score = 24.0
 
     amount = float(contrib.get("amount") or 0)
     if amount >= 10000:

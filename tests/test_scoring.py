@@ -230,3 +230,30 @@ def test_detail_json_includes_core_provenance_ids():
     assert detail["vote_id"] == "v123"
     assert detail["bill_id"] == "hr1-119"
     assert detail["asset_id"] == 7
+
+
+def test_conflict_detail_json_includes_available_provenance_fields():
+    scored = _score(
+        ConflictCandidate(
+            conflict_type="committee_donor",
+            raw_score=35.0,
+            contribution_id=9,
+            evidence={
+                "committee_jurisdiction_match": True,
+                "source_quality": "public_fec_records_with_committee_metadata",
+                "contribution_source_table": "raw.fec_individual_contributions",
+                "contribution_source_key": "102:2024",
+                "contribution_source_sub_id": "102",
+                "contribution_source_image_num": "IMG3",
+                "contribution_source_transaction_id": "TX1",
+                "contribution_source_hash": "abc123",
+                "contribution_source_url": None,
+            },
+        )
+    )
+    detail = json.loads(scored["detail_json"])
+    assert detail["contribution_source_table"] == "raw.fec_individual_contributions"
+    assert detail["contribution_source_key"] == "102:2024"
+    assert detail["contribution_source_sub_id"] == "102"
+    assert detail["contribution_source_image_num"] == "IMG3"
+    assert detail["contribution_source_transaction_id"] == "TX1"

@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -11,6 +12,32 @@ from ..deps import get_session
 from lighthouse.db import queries as q
 from lighthouse.db.models import StockTransaction, Member
 from lighthouse.reporting.member_report import build_report
+from lighthouse.services.civic_api import CivicApiClient, CivicApiError, parse_location, parse_voter_info
+from lighthouse.config import config as _cfg
+
+_STATE_NAME_TO_CODE = {
+    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
+    "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE",
+    "florida": "FL", "georgia": "GA", "hawaii": "HI", "idaho": "ID",
+    "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS",
+    "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD",
+    "massachusetts": "MA", "michigan": "MI", "minnesota": "MN", "mississippi": "MS",
+    "missouri": "MO", "montana": "MT", "nebraska": "NE", "nevada": "NV",
+    "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY",
+    "north carolina": "NC", "north dakota": "ND", "ohio": "OH", "oklahoma": "OK",
+    "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC",
+    "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT",
+    "vermont": "VT", "virginia": "VA", "washington": "WA", "west virginia": "WV",
+    "wisconsin": "WI", "wyoming": "WY", "district of columbia": "DC",
+}
+_VALID_STATE_CODES = set(_STATE_NAME_TO_CODE.values())
+
+
+def _resolve_state_code(text: str) -> Optional[str]:
+    text = text.strip()
+    if len(text) == 2 and text.upper() in _VALID_STATE_CODES:
+        return text.upper()
+    return _STATE_NAME_TO_CODE.get(text.lower())
 
 router = APIRouter()
 
@@ -109,6 +136,91 @@ def conflicts_explorer(
         "conflict_type": type or "",
         "chamber": chamber or "",
         "search": search or "",
+    })
+
+
+@router.get("/elections", response_class=HTMLResponse)
+def elections(
+    request: Request,
+    search: Optional[str] = None,
+    cycle: Optional[str] = None,
+    level: Optional[str] = None,
+    session: Session = Depends(get_session),
+):
+    cycle_int: Optional[int] = int(cycle) if cycle and cycle.strip().isdigit() else None
+
+    result_type = None
+    civic_data = None
+    civic_error = None
+    state_races = None
+    member_results = None
+    state_code = None
+    available_cycles = q.get_available_election_cycles(session)
+
+    query = (search or "").strip()
+
+    if query:
+        if re.match(r"^\d{5}$", query):
+            result_type = "zip"
+            api_key = _cfg.api_keys.google_civic
+            if not api_key:
+                civic_error = "Google Civic API key not configured."
+            else:
+                try:
+                    client = CivicApiClient(api_key)
+                    raw_loc = client.get_location_from_zip(query)
+                    location = parse_location(raw_loc)
+                    zip_state = location.get("state")
+                    zip_members = []
+                    if zip_state:
+                        zip_members = q.get_members_with_scores(session, limit=50)
+                        zip_members = [m for m in zip_members if m.get("state") == zip_state]
+                    civic_data = {
+                        "location": location,
+                        "zip_members": zip_members,
+                    }
+                    upcoming = client.get_upcoming_elections()
+                    for election in upcoming:
+                        try:
+                            raw_vi = client.get_voter_info(query, election["id"])
+                            vi = parse_voter_info(raw_vi)
+                            if vi.get("contests"):
+                                civic_data["voter_info"] = vi
+                                civic_data["election_name"] = election.get("name", "")
+                                civic_data["election_day"] = election.get("electionDay", "")
+                                break
+                        except CivicApiError:
+                            continue
+                except CivicApiError as exc:
+                    civic_error = str(exc)
+
+        else:
+            state_code = _resolve_state_code(query)
+            if state_code:
+                result_type = "state"
+                state_races = q.get_elections_for_state(
+                    session, state_code, cycle=cycle_int, office_level=level or None
+                )
+            else:
+                result_type = "member"
+                member_results = q.get_members_with_scores(session, search=query, limit=20)
+                for m in member_results:
+                    m["election_history"] = q.get_election_history_for_member(
+                        session, m["bioguide_id"]
+                    )
+
+    return templates.TemplateResponse(request, "elections.html", {
+        "active_page": "elections",
+        "query": query,
+        "result_type": result_type,
+        "civic_data": civic_data,
+        "civic_error": civic_error,
+        "state_races": state_races,
+        "state_code": state_code,
+        "member_results": member_results,
+        "cycle": cycle or "",
+        "level": level or "",
+        "available_cycles": available_cycles,
     })
 
 

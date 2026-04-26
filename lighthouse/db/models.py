@@ -4,7 +4,7 @@ from typing import Optional
 
 from sqlalchemy import (
     Boolean, Column, Date, DateTime, Float, ForeignKey,
-    Index, Integer, MetaData, Numeric, String, Text, create_engine, text,
+    Index, Integer, MetaData, Numeric, String, Text, create_engine, inspect, text,
 )
 from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
 
@@ -148,7 +148,9 @@ class RawFecIndividualContribution(Base):
     amount = Column(Numeric(14, 2))
     other_id = Column(String(9))
     image_num = Column(String(20))
+    memo_code = Column(String(5))
     memo_text = Column(Text)
+    source_transaction_id = Column(String(100))
     derived_sector = Column(String(50))
     source_record_hash = Column(String(64))
     imported_at = Column(DateTime, default=datetime.utcnow)
@@ -263,7 +265,7 @@ class Asset(Base):
     disclosure_id = Column(Integer, ForeignKey("financial_disclosures.id"), nullable=False)
     bioguide_id = Column(String(10), ForeignKey("members.bioguide_id"), nullable=False)
     asset_name = Column(Text, nullable=False)
-    asset_type = Column(String(30))    # stock | bond | fund | real_estate | other
+    asset_type = Column(String(30))    # public_equity | bond | fund | real_estate | private_business | trust | unknown
     ticker = Column(String(20))
     value_min = Column(Numeric(15, 2))
     value_max = Column(Numeric(15, 2))
@@ -293,6 +295,10 @@ class StockTransaction(Base):
     owner = Column(String(20))             # self | spouse | joint
     source = Column(String(30))            # house_watcher | senate_watcher | disclosure
     comment = Column(Text)
+    source_url = Column(Text)
+    source_file = Column(Text)
+    source_key = Column(String(200))
+    source_hash = Column(String(64))
     sector = Column(String(50))
     industry_code = Column(String(20))
 
@@ -313,6 +319,14 @@ class CampaignContribution(Base):
     contribution_date = Column(Date)
     election_cycle = Column(Integer)
     contribution_type = Column(String(20))  # individual | pac
+    source_table = Column(String(100))
+    source_key = Column(String(200))
+    source_url = Column(Text)
+    source_file = Column(Text)
+    source_hash = Column(String(64))
+    source_sub_id = Column(String(100))
+    source_image_num = Column(String(20))
+    source_transaction_id = Column(String(100))
 
     member = relationship("Member", back_populates="contributions")
     conflicts = relationship("Conflict", back_populates="contribution")
@@ -360,7 +374,48 @@ class Conflict(Base):
     contribution = relationship("CampaignContribution", back_populates="conflicts")
 
 
+class ElectionRace(Base):
+    __tablename__ = "election_races"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cycle = Column(Integer, nullable=False)
+    state = Column(String(2), nullable=False)
+    office = Column(String(100))
+    office_level = Column(String(20))       # federal | state | local
+    district = Column(String(20))
+    stage = Column(String(20))              # general | primary | runoff
+    special = Column(Boolean, default=False)
+    election_date = Column(Date, nullable=True)
+    total_votes = Column(Integer, nullable=True)
+    source = Column(String(50))             # mit_election_lab | manual
+    source_key = Column(String(200), unique=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    candidates = relationship("ElectionCandidate", back_populates="race", cascade="all, delete-orphan")
+
+
+class ElectionCandidate(Base):
+    __tablename__ = "election_candidates"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    race_id = Column(Integer, ForeignKey("election_races.id"), nullable=False)
+    bioguide_id = Column(String(10), ForeignKey("members.bioguide_id"), nullable=True)
+    candidate_name = Column(String(200), nullable=False)
+    party = Column(String(50))
+    votes = Column(Integer, nullable=True)
+    vote_pct = Column(Float, nullable=True)
+    winner = Column(Boolean, default=False)
+    incumbent = Column(Boolean, default=False)
+    fec_candidate_id = Column(String(20), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    race = relationship("ElectionRace", back_populates="candidates")
+    member = relationship("Member")
+
+
 # Indexes for common query patterns
+Index("idx_election_races_state_cycle", ElectionRace.state, ElectionRace.cycle)
+Index("idx_election_candidates_bioguide", ElectionCandidate.bioguide_id)
 Index("idx_conflicts_member", Conflict.bioguide_id)
 Index("idx_conflicts_type", Conflict.conflict_type)
 Index("idx_conflicts_score", Conflict.score)
@@ -370,13 +425,19 @@ Index("idx_raw_fec_committees_candidate_year", RawFecCommittee.candidate_id, Raw
 Index("idx_raw_fec_linkages_member_year", RawFecCandidateCommitteeLinkage.member_bioguide_id, RawFecCandidateCommitteeLinkage.file_year)
 Index("idx_raw_fec_contrib_member_year", RawFecIndividualContribution.member_bioguide_id, RawFecIndividualContribution.file_year)
 Index("idx_raw_fec_contrib_committee_year", RawFecIndividualContribution.committee_id, RawFecIndividualContribution.file_year)
+Index("idx_raw_fec_contrib_source_txn_id", RawFecIndividualContribution.source_transaction_id)
 Index("idx_member_identifiers_type_value", MemberIdentifier.identifier_type, MemberIdentifier.identifier_value)
 Index("idx_member_identifiers_bioguide", MemberIdentifier.bioguide_id)
 Index("idx_stock_transactions_member_date", StockTransaction.bioguide_id, StockTransaction.transaction_date)
+Index("idx_stock_transactions_source_key", StockTransaction.source_key)
+Index("idx_stock_transactions_source_hash", StockTransaction.source_hash)
 Index("idx_member_votes_member", MemberVote.bioguide_id)
 Index("idx_assets_member_ticker", Asset.bioguide_id, Asset.ticker)
 Index("idx_bills_sponsor", Bill.sponsor_bioguide)
 Index("idx_bills_policy_area", Bill.policy_area)
+Index("idx_campaign_contributions_source_key", CampaignContribution.source_key)
+Index("idx_campaign_contributions_source_sub_id", CampaignContribution.source_sub_id)
+Index("idx_campaign_contributions_source_hash", CampaignContribution.source_hash)
 
 
 def get_engine(db_url: str):
@@ -394,7 +455,64 @@ def init_db(db_url: str, engine=None):
     engine = engine or get_engine(db_url)
     _ensure_schemas(engine, db_url)
     Base.metadata.create_all(engine)
+    upgrade_db(engine)
     return engine
+
+
+def upgrade_db(engine) -> None:
+    inspector = inspect(engine)
+    core_schema = CORE_SCHEMA if engine.dialect.name == "postgresql" else None
+    raw_schema = RAW_SCHEMA if engine.dialect.name == "postgresql" else None
+    existing_tables = set(inspector.get_table_names(schema=core_schema))
+    raw_tables = set(inspector.get_table_names(schema=raw_schema))
+
+    if "campaign_contributions" in existing_tables:
+        _ensure_columns(
+            engine,
+            schema=core_schema,
+            table_name="campaign_contributions",
+            columns={
+                "source_table": "TEXT",
+                "source_key": "VARCHAR(200)",
+                "source_url": "TEXT",
+                "source_file": "TEXT",
+                "source_hash": "VARCHAR(64)",
+                "source_sub_id": "VARCHAR(100)",
+                "source_image_num": "VARCHAR(20)",
+                "source_transaction_id": "VARCHAR(100)",
+            },
+        )
+        _ensure_index(engine, schema=core_schema, table_name="campaign_contributions", index_name="idx_campaign_contributions_source_key", columns=["source_key"])
+        _ensure_index(engine, schema=core_schema, table_name="campaign_contributions", index_name="idx_campaign_contributions_source_sub_id", columns=["source_sub_id"])
+        _ensure_index(engine, schema=core_schema, table_name="campaign_contributions", index_name="idx_campaign_contributions_source_hash", columns=["source_hash"])
+
+    if "stock_transactions" in existing_tables:
+        _ensure_columns(
+            engine,
+            schema=core_schema,
+            table_name="stock_transactions",
+            columns={
+                "source_url": "TEXT",
+                "source_file": "TEXT",
+                "source_key": "VARCHAR(200)",
+                "source_hash": "VARCHAR(64)",
+            },
+        )
+        _ensure_index(engine, schema=core_schema, table_name="stock_transactions", index_name="idx_stock_transactions_source_key", columns=["source_key"])
+        _ensure_index(engine, schema=core_schema, table_name="stock_transactions", index_name="idx_stock_transactions_source_hash", columns=["source_hash"])
+
+    raw_table_exists = "fec_individual_contributions" in raw_tables
+    if raw_table_exists:
+        _ensure_columns(
+            engine,
+            schema=raw_schema,
+            table_name="fec_individual_contributions",
+            columns={
+                "memo_code": "VARCHAR(5)",
+                "source_transaction_id": "VARCHAR(100)",
+            },
+        )
+        _ensure_index(engine, schema=raw_schema, table_name="fec_individual_contributions", index_name="idx_raw_fec_contrib_source_txn_id", columns=["source_transaction_id"])
 
 
 def _ensure_schemas(engine, db_url: str):
@@ -404,3 +522,35 @@ def _ensure_schemas(engine, db_url: str):
     with engine.begin() as conn:
         for schema in (RAW_SCHEMA, CORE_SCHEMA, ANALYTICS_SCHEMA):
             conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
+
+
+def _ensure_columns(engine, *, schema: Optional[str], table_name: str, columns: dict[str, str]) -> None:
+    inspector = inspect(engine)
+    existing = {col["name"] for col in inspector.get_columns(table_name, schema=schema)}
+    with engine.begin() as conn:
+        for column_name, column_type in columns.items():
+            if column_name in existing:
+                continue
+            qualified = _qualified_name(engine.dialect.name, schema, table_name)
+            conn.execute(text(f"ALTER TABLE {qualified} ADD COLUMN {column_name} {column_type}"))
+
+
+def _ensure_index(engine, *, schema: Optional[str], table_name: str, index_name: str, columns: list[str]) -> None:
+    inspector = inspect(engine)
+    existing = {idx["name"] for idx in inspector.get_indexes(table_name, schema=schema)}
+    if index_name in existing:
+        return
+    qualified = _qualified_name(engine.dialect.name, schema, table_name)
+    column_sql = ", ".join(columns)
+    if engine.dialect.name == "postgresql":
+        sql = f'CREATE INDEX IF NOT EXISTS "{index_name}" ON {qualified} ({column_sql})'
+    else:
+        sql = f'CREATE INDEX IF NOT EXISTS "{index_name}" ON {qualified} ({column_sql})'
+    with engine.begin() as conn:
+        conn.execute(text(sql))
+
+
+def _qualified_name(dialect_name: str, schema: Optional[str], table_name: str) -> str:
+    if dialect_name == "postgresql" and schema:
+        return f'"{schema}"."{table_name}"'
+    return table_name

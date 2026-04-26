@@ -2,6 +2,7 @@
 Named query helpers used by the detection engine and reporting layer.
 All queries return plain dicts (not ORM objects) for portability.
 """
+from collections import Counter
 from typing import Optional
 
 from sqlalchemy import func, text
@@ -9,9 +10,43 @@ from sqlalchemy.orm import Session
 
 from .models import (
     Asset, Bill, BillCosponsor, CampaignContribution, CommitteeMembership,
-    Conflict, FinancialDisclosure, IngestionLog, Member, MemberIdentifier, MemberVote,
-    StockTransaction, Vote,
+    Conflict, ElectionCandidate, ElectionRace, FinancialDisclosure, IngestionLog,
+    Member, MemberIdentifier, MemberVote, StockTransaction, Vote,
 )
+from ..detection.asset_classifier import classify_asset_record
+
+import json as _json
+
+
+def _compute_risk_score(scores: list[float]) -> float:
+    """Decay-weighted aggregate: rewards breadth of evidence beyond the single max signal."""
+    if not scores:
+        return 0.0
+    scores = sorted(scores, reverse=True)
+    weights = [1.0, 0.5, 0.25] + [0.1] * max(0, len(scores) - 3)
+    return round(sum(s * w for s, w in zip(scores, weights)), 1)
+
+
+def _extract_event_date(conflict_type: str, detail_json_str, vote_date=None, bill_date=None) -> Optional[str]:
+    """Return the most meaningful event date for a signal — not the script-run timestamp."""
+    detail: dict = {}
+    if detail_json_str:
+        try:
+            detail = _json.loads(detail_json_str)
+        except Exception:
+            pass
+
+    if conflict_type in ("trade_timing_pre", "trade_timing_post"):
+        d = detail.get("transaction_date") or detail.get("vote_date")
+        return str(d)[:10] if d else None
+    elif conflict_type in ("vote_holding", "family_holding"):
+        return str(vote_date)[:10] if vote_date else None
+    elif conflict_type == "sponsorship_holding":
+        return str(bill_date)[:10] if bill_date else None
+    elif conflict_type == "committee_donor":
+        cycle = detail.get("election_cycle")
+        return f"Cycle {cycle}" if cycle else None
+    return None
 
 
 def get_members(session: Session, bioguide_id: Optional[str] = None) -> list[Member]:
@@ -78,24 +113,89 @@ def get_member_assets(
         .all()
     )
     return [
-        {
+        _asset_to_dict(asset, disclosure)
+        for asset, disclosure in rows
+    ]
+
+
+def _asset_to_dict(asset: Asset, disclosure: FinancialDisclosure) -> dict:
+    classification = classify_asset_record({
+        "asset_name": asset.asset_name,
+        "ticker": asset.ticker,
+        "asset_type": asset.asset_type,
+        "sector": asset.sector,
+    })
+    return {
             "id": asset.id,
             "asset_name": asset.asset_name,
             "asset_type": asset.asset_type,
+            "asset_class": classification["asset_class"],
             "ticker": asset.ticker,
             "value_min": float(asset.value_min) if asset.value_min else None,
             "value_max": float(asset.value_max) if asset.value_max else None,
             "owner": asset.owner,
             "year": asset.year,
-            "sector": asset.sector,
+            "sector": classification["sector"],
+            "classification_confidence": classification["classification_confidence"],
+            "classification_reason": classification["classification_reason"],
+            "matched_ticker": classification["matched_ticker"],
+            "is_diversified": classification["is_diversified"],
             "disclosure_id": disclosure.id,
             "disclosure_source": disclosure.source,
             "disclosure_source_url": disclosure.source_url,
             "disclosure_filed_date": str(disclosure.filed_date) if disclosure.filed_date else None,
             "disclosure_raw_file_path": disclosure.raw_file_path,
         }
-        for asset, disclosure in rows
-    ]
+
+
+def get_asset_classification_distribution(
+    session: Session,
+    bioguide_id: Optional[str] = None,
+    min_value: float = 1000.0,
+) -> dict:
+    query = session.query(Asset)
+    if bioguide_id:
+        query = query.filter(Asset.bioguide_id == bioguide_id)
+    query = query.filter((Asset.value_max.is_(None)) | (Asset.value_max >= min_value))
+
+    sector_counts: Counter[str] = Counter()
+    asset_class_counts: Counter[str] = Counter()
+    confidence_counts: Counter[str] = Counter()
+    unknown_count = 0
+    other_count = 0
+    diversified_count = 0
+
+    for asset in query.all():
+        classified = classify_asset_record({
+            "asset_name": asset.asset_name,
+            "ticker": asset.ticker,
+            "asset_type": asset.asset_type,
+            "sector": asset.sector,
+        })
+        sector = classified["sector"] or "unknown"
+        asset_class = classified["asset_class"] or "unknown"
+        confidence = classified["classification_confidence"] or "low"
+
+        sector_counts[sector] += 1
+        asset_class_counts[asset_class] += 1
+        confidence_counts[confidence] += 1
+
+        if sector in {"unknown", "other"} or asset_class in {"unknown", "other"}:
+            unknown_count += 1
+        if sector == "other" or asset_class == "other":
+            other_count += 1
+        if sector == "diversified" or asset_class == "diversified_fund" or classified.get("is_diversified"):
+            diversified_count += 1
+
+    return {
+        "sector_counts": dict(sector_counts),
+        "asset_class_counts": dict(asset_class_counts),
+        "confidence_counts": dict(confidence_counts),
+        "unknown_count": unknown_count,
+        "other_count": other_count,
+        "diversified_count": diversified_count,
+        "total": sum(sector_counts.values()),
+    }
 
 
 def get_member_transactions(session: Session, bioguide_id: str) -> list[dict]:
@@ -118,6 +218,10 @@ def get_member_transactions(session: Session, bioguide_id: str) -> list[dict]:
             "owner": t.owner,
             "sector": t.sector,
             "source": t.source,
+            "source_url": t.source_url,
+            "source_file": t.source_file,
+            "source_key": t.source_key,
+            "source_hash": t.source_hash,
         }
         for t in rows
     ]
@@ -238,6 +342,14 @@ def get_contributions(session: Session, bioguide_id: str) -> list[dict]:
             "election_cycle": c.election_cycle,
             "contribution_type": c.contribution_type,
             "fec_committee_id": c.fec_committee_id,
+            "source_table": c.source_table,
+            "source_key": c.source_key,
+            "source_url": c.source_url,
+            "source_file": c.source_file,
+            "source_hash": c.source_hash,
+            "source_sub_id": c.source_sub_id,
+            "source_image_num": c.source_image_num,
+            "source_transaction_id": c.source_transaction_id,
         }
         for c in rows
     ]
@@ -304,7 +416,9 @@ def _bill_to_dict(b: Bill) -> dict:
 
 def get_conflicts_for_member(session: Session, bioguide_id: str) -> list[dict]:
     rows = (
-        session.query(Conflict)
+        session.query(Conflict, Vote.vote_date, Bill.introduced_date)
+        .outerjoin(Vote, Conflict.vote_id == Vote.vote_id)
+        .outerjoin(Bill, Conflict.bill_id == Bill.bill_id)
         .filter(Conflict.bioguide_id == bioguide_id)
         .order_by(Conflict.score.desc())
         .all()
@@ -322,9 +436,10 @@ def get_conflicts_for_member(session: Session, bioguide_id: str) -> list[dict]:
             "contribution_id": c.contribution_id,
             "evidence_summary": c.evidence_summary,
             "detail_json": c.detail_json,
-            "detected_at": str(c.detected_at) if c.detected_at else None,
+            "detected_at": str(c.detected_at)[:10] if c.detected_at else None,
+            "event_date": _extract_event_date(c.conflict_type, c.detail_json, vote_date, bill_date),
         }
-        for c in rows
+        for c, vote_date, bill_date in rows
     ]
 
 
@@ -467,6 +582,16 @@ def get_members_with_scores(
         q = q.order_by(func.count(Conflict.id).desc())
 
     rows = q.limit(limit).all()
+
+    # Fetch all scores per member for decay-weighted risk computation
+    score_rows = (
+        session.query(Conflict.bioguide_id, Conflict.score)
+        .all()
+    )
+    member_score_lists: dict[str, list[float]] = {}
+    for bid, score in score_rows:
+        member_score_lists.setdefault(bid, []).append(float(score or 0))
+
     return [
         {
             "bioguide_id": m.bioguide_id,
@@ -478,6 +603,7 @@ def get_members_with_scores(
             "profile_image_url": _profile_image_url(m.bioguide_id),
             "conflict_count": conflict_count,
             "max_score": round(float(max_score), 1),
+            "risk_score": _compute_risk_score(member_score_lists.get(m.bioguide_id, [])),
             "high_count": int(high_count or 0),
         }
         for m, conflict_count, max_score, high_count in rows
@@ -494,8 +620,10 @@ def get_all_conflicts(
 ) -> list[dict]:
     """All conflicts joined with member info — used by the /conflicts explorer."""
     q = (
-        session.query(Conflict, Member)
+        session.query(Conflict, Member, Vote.vote_date, Bill.introduced_date)
         .join(Member, Conflict.bioguide_id == Member.bioguide_id)
+        .outerjoin(Vote, Conflict.vote_id == Vote.vote_id)
+        .outerjoin(Bill, Conflict.bill_id == Bill.bill_id)
         .order_by(Conflict.score.desc())
     )
 
@@ -525,8 +653,9 @@ def get_all_conflicts(
             "bill_id": c.bill_id,
             "vote_id": c.vote_id,
             "detected_at": str(c.detected_at)[:10] if c.detected_at else None,
+            "event_date": _extract_event_date(c.conflict_type, c.detail_json, vote_date, bill_date),
         }
-        for c, m in rows
+        for c, m, vote_date, bill_date in rows
     ]
 
 
@@ -544,7 +673,7 @@ def get_top_conflicts(session: Session, limit: int = 10) -> list[dict]:
     )
 
     rows = (
-        session.query(Conflict, Member)
+        session.query(Conflict, Member, Vote.vote_date, Bill.introduced_date)
         .join(Member, Conflict.bioguide_id == Member.bioguide_id)
         .join(
             max_per_member,
@@ -553,6 +682,8 @@ def get_top_conflicts(session: Session, limit: int = 10) -> list[dict]:
                 Conflict.score == max_per_member.c.max_score,
             ),
         )
+        .outerjoin(Vote, Conflict.vote_id == Vote.vote_id)
+        .outerjoin(Bill, Conflict.bill_id == Bill.bill_id)
         .order_by(Conflict.score.desc(), Conflict.detected_at.desc())
         .all()
     )
@@ -560,7 +691,7 @@ def get_top_conflicts(session: Session, limit: int = 10) -> list[dict]:
     # Keep the first row per member in score order to avoid duplicates on score ties.
     top: list[dict] = []
     seen: set[str] = set()
-    for c, m in rows:
+    for c, m, vote_date, bill_date in rows:
         if c.bioguide_id in seen:
             continue
         seen.add(c.bioguide_id)
@@ -580,6 +711,7 @@ def get_top_conflicts(session: Session, limit: int = 10) -> list[dict]:
                 "bill_id": c.bill_id,
                 "vote_id": c.vote_id,
                 "detected_at": str(c.detected_at)[:10] if c.detected_at else None,
+                "event_date": _extract_event_date(c.conflict_type, c.detail_json, vote_date, bill_date),
             }
         )
         if len(top) >= limit:
@@ -612,6 +744,108 @@ def get_recent_transactions(session: Session, limit: int = 20) -> list[dict]:
         }
         for t, m in rows
     ]
+
+
+def get_election_history_for_member(session: Session, bioguide_id: str) -> list[dict]:
+    """All races where this member appeared as a candidate (linked by bioguide_id)."""
+    rows = (
+        session.query(ElectionCandidate, ElectionRace)
+        .join(ElectionRace, ElectionCandidate.race_id == ElectionRace.id)
+        .filter(ElectionCandidate.bioguide_id == bioguide_id)
+        .order_by(ElectionRace.cycle.desc(), ElectionRace.stage.asc())
+        .all()
+    )
+    return [_election_candidate_to_dict(c, r) for c, r in rows]
+
+
+def get_elections_for_state(
+    session: Session,
+    state: str,
+    cycle: Optional[int] = None,
+    office_level: Optional[str] = None,
+    stage: str = "general",
+    limit: int = 300,
+) -> list[dict]:
+    """All election races for a given state, ordered by most recent cycle."""
+    q = (
+        session.query(ElectionRace)
+        .filter(ElectionRace.state == state.upper())
+        .order_by(ElectionRace.cycle.desc(), ElectionRace.office.asc())
+    )
+    if cycle:
+        q = q.filter(ElectionRace.cycle == cycle)
+    if office_level:
+        q = q.filter(ElectionRace.office_level == office_level)
+    if stage:
+        q = q.filter(ElectionRace.stage == stage)
+    return [_race_to_dict(r) for r in q.limit(limit).all()]
+
+
+def get_available_election_cycles(session: Session) -> list[int]:
+    rows = session.query(ElectionRace.cycle).distinct().order_by(ElectionRace.cycle.desc()).all()
+    return [r[0] for r in rows]
+
+
+def _race_to_dict(race: ElectionRace) -> dict:
+    candidates = sorted(race.candidates, key=lambda c: c.votes or 0, reverse=True)
+    return {
+        "id": race.id,
+        "cycle": race.cycle,
+        "state": race.state,
+        "office": race.office,
+        "office_level": race.office_level,
+        "district": race.district,
+        "stage": race.stage,
+        "special": race.special,
+        "election_date": str(race.election_date) if race.election_date else None,
+        "total_votes": race.total_votes,
+        "candidates": [
+            {
+                "id": c.id,
+                "name": c.candidate_name,
+                "party": c.party,
+                "votes": c.votes,
+                "vote_pct": c.vote_pct,
+                "winner": c.winner,
+                "incumbent": c.incumbent,
+                "bioguide_id": c.bioguide_id,
+            }
+            for c in candidates
+        ],
+    }
+
+
+def _election_candidate_to_dict(candidate: ElectionCandidate, race: ElectionRace) -> dict:
+    opponents = sorted(
+        [c for c in race.candidates if c.id != candidate.id],
+        key=lambda c: c.votes or 0,
+        reverse=True,
+    )
+    margin = None
+    if candidate.votes and opponents and opponents[0].votes:
+        margin = candidate.votes - opponents[0].votes
+    return {
+        "cycle": race.cycle,
+        "state": race.state,
+        "office": race.office,
+        "office_level": race.office_level,
+        "district": race.district,
+        "stage": race.stage,
+        "special": race.special,
+        "election_date": str(race.election_date) if race.election_date else None,
+        "votes": candidate.votes,
+        "vote_pct": candidate.vote_pct,
+        "winner": candidate.winner,
+        "incumbent": candidate.incumbent,
+        "total_votes": race.total_votes,
+        "margin": margin,
+        "top_opponent": {
+            "name": opponents[0].candidate_name,
+            "party": opponents[0].party,
+            "votes": opponents[0].votes,
+            "vote_pct": opponents[0].vote_pct,
+        } if opponents else None,
+    }
 
 
 def _profile_image_url(bioguide_id: str) -> str:

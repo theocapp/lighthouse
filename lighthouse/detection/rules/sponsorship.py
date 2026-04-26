@@ -9,7 +9,7 @@ from ..rules.vote_holding import (
     _asset_name_matches_bill,
     _is_narrow_industry_match,
 )
-from ...detection.industry_map import asset_name_is_diversified, bill_sectors, ticker_to_sector
+from ...detection.industry_map import bill_sectors, ticker_to_sector
 
 
 def detect(
@@ -31,10 +31,20 @@ def detect(
     for asset in assets:
         if float(asset.get("value_max") or 0) < 1000:
             continue
-        if asset_name_is_diversified(asset.get("asset_name") or ""):
+        asset_class = (asset.get("asset_class") or asset.get("asset_type") or "unknown").lower()
+        if asset.get("is_diversified") or asset_class in {
+            "diversified_fund",
+            "cash_or_deposit",
+            "money_market",
+            "treasury",
+            "municipal_bond",
+            "corporate_bond",
+            "private_business",
+            "trust",
+        }:
             continue
         sector = asset.get("sector") or ticker_to_sector(asset.get("ticker") or "")
-        if not sector or sector in ("unknown", "diversified"):
+        if not sector or sector in ("unknown", "diversified", "cash", "fixed_income"):
             continue
         asset_by_sector.setdefault(sector, []).append(asset)
 
@@ -84,6 +94,7 @@ def detect(
                         "source_quality": "public_disclosure_with_bill_metadata",
                         "bill_source_url": bill.get("govinfo_url"),
                         "asset_source_url": asset.get("disclosure_source_url"),
+                        "asset_source_file": asset.get("disclosure_raw_file_path"),
                         "asset_parser_source": asset.get("disclosure_source"),
                         "disclosure_id": asset.get("disclosure_id"),
                     },

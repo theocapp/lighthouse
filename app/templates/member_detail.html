@@ -1,283 +1,331 @@
 {% extends "base.html" %}
 {% block title %}{{ report.member.full_name }}{% endblock %}
-{% block heading %}{{ report.member.full_name }}{% endblock %}
-{% block subheading %}
-  {{ report.member.chamber | title }} ·
-  {{ report.member.state }}{% if report.member.district and report.member.district != 0 %}-{{ report.member.district }}{% endif %}
-  · {{ report.member.party }}
-{% endblock %}
 
 {% block content %}
 
-<div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-  {{ report.disclaimer }}
-</div>
+<!-- ── 1. VERDICT BANNER ─────────────────────────────────────────────── -->
+<div style="border-radius:0.5rem; overflow:hidden; margin-bottom:1.5rem; border:1px solid;
+  {% if report.summary.risk_score >= 53 %}background:#fef2f2; border-color:#fca5a5;
+  {% elif report.summary.total_conflicts > 0 %}background:#fffbeb; border-color:#fcd34d;
+  {% else %}background:#f0fdf4; border-color:#bbf7d0;{% endif %}">
+  <div style="padding:1.5rem 2rem; display:flex; flex-wrap:wrap; gap:1.5rem; align-items:center; justify-content:space-between;">
 
-<!-- ── Hero header ─────────────────────────────────────────────────── -->
-<div class="bg-white border border-slate-200 rounded-xl shadow-sm px-6 py-5 mb-5 flex flex-wrap gap-6 items-start">
-
-  <!-- Avatar + identity -->
-  <div class="flex items-start gap-4 flex-1 min-w-64">
-    <div class="relative shrink-0">
-      <img
-        src="{{ report.member.profile_image_url }}"
-        alt="{{ report.member.full_name }}"
-        class="w-20 h-20 rounded-2xl object-cover border border-slate-200 shadow-sm"
-        onerror="if (this.dataset.fallback !== '1') { this.dataset.fallback='1'; this.src='{{ report.member.profile_image_fallback_url }}'; } else { this.style.display='none'; this.nextElementSibling.style.display='flex'; }"
-      >
-      <div class="w-20 h-20 rounded-2xl hidden items-center justify-center text-2xl font-bold text-white shadow-sm
-        {% if report.member.party == 'D' %}bg-blue-600{% elif report.member.party == 'R' %}bg-red-600{% else %}bg-slate-500{% endif %}">
-        {{ report.member.initials }}
+    <!-- Score + verdict -->
+    <div style="display:flex; align-items:center; gap:1.5rem;">
+      <div style="text-align:center; flex-shrink:0;">
+        <div style="font-family:Georgia,serif; font-size:4rem; font-weight:900; line-height:1;
+          {% if report.summary.risk_score >= 53 %}color:#b91c1c;
+          {% elif report.summary.total_conflicts > 0 %}color:#92400e;
+          {% else %}color:#166534;{% endif %}">{{ report.summary.risk_score }}</div>
+        <div style="font-family:system-ui,sans-serif; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.1em; color:#6b7280; margin-top:2px;">Signal Score</div>
+      </div>
+      <div>
+        <div style="font-family:Georgia,serif; font-size:1.1rem; font-weight:700; margin-bottom:0.25rem;
+          {% if report.summary.risk_score >= 53 %}color:#7f1d1d;
+          {% elif report.summary.total_conflicts > 0 %}color:#78350f;
+          {% else %}color:#14532d;{% endif %}">
+          {% if report.summary.risk_score >= 53 %}Strong signals detected.
+          {% elif report.summary.total_conflicts > 0 %}Signals detected — review the evidence below.
+          {% else %}No signals detected in current dataset.{% endif %}
+        </div>
+        <div style="font-family:system-ui,sans-serif; font-size:0.8rem; color:#6b7280;">{{ report.disclaimer }}</div>
       </div>
     </div>
-    <div>
-      <div class="flex items-center gap-2 flex-wrap">
-        <span class="text-xl font-bold text-slate-900">{{ report.member.full_name }}</span>
-        <span class="px-2 py-0.5 rounded text-xs font-bold badge-{{ report.member.party }}">{{ report.member.party }}</span>
-        {% if report.summary.max_score >= 53 %}
-        <span class="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700">Strong Signal</span>
-        {% elif report.summary.total_conflicts > 0 %}
-        <span class="px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-700">Signal Detected</span>
-        {% endif %}
+
+    <!-- Key counts -->
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap; font-family:system-ui,sans-serif;">
+      <div style="text-align:center; background:rgba(255,255,255,0.7); border:1px solid #fca5a5; border-radius:0.4rem; padding:0.5rem 0.9rem;">
+        <div style="font-size:1.4rem; font-weight:800; color:#b91c1c;">{{ report.summary.high_confidence }}</div>
+        <div style="font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#b91c1c;">High Evidence</div>
       </div>
-      <div class="text-sm text-slate-500 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-        <span>{{ report.member.display_title }}</span>
-        <span>{{ report.member.seat_label }}</span>
-        {% if report.member.bioguide_id %}<span class="font-mono text-xs text-slate-400">{{ report.member.bioguide_id }}</span>{% endif %}
+      <div style="text-align:center; background:rgba(255,255,255,0.7); border:1px solid #e5e7eb; border-radius:0.4rem; padding:0.5rem 0.9rem;">
+        <div style="font-size:1.4rem; font-weight:800; color:#374151;">{{ report.summary.total_conflicts }}</div>
+        <div style="font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280;">Signals</div>
       </div>
-      <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-500">
-        <div>Identifiers: {{ report.identity.identifiers | length }}</div>
-        <div>Committees: {{ report.summary.committee_count }}</div>
-        <div>Latest vote: {{ report.coverage.latest_vote_date or "No vote data" }}</div>
-        <div>Latest trade: {{ report.coverage.latest_trade_date or "No trade data" }}</div>
+      <div style="text-align:center; background:rgba(255,255,255,0.7); border:1px solid #e5e7eb; border-radius:0.4rem; padding:0.5rem 0.9rem;">
+        <div style="font-size:1.4rem; font-weight:800; color:#374151;">{{ report.summary.total_transactions }}</div>
+        <div style="font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280;">Trades</div>
       </div>
-      {% if report.summary.committees %}
-      <div class="mt-2 flex flex-wrap gap-1">
-        {% for c in report.summary.committee_roles %}
-        <span class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded" title="{{ c.role }}{% if c.congress %} · Congress {{ c.congress }}{% endif %}">{{ c.committee_name }}</span>
-        {% endfor %}
+      <div style="text-align:center; background:rgba(255,255,255,0.7); border:1px solid #e5e7eb; border-radius:0.4rem; padding:0.5rem 0.9rem;">
+        <div style="font-size:1.4rem; font-weight:800; color:#374151;">{{ report.summary.total_assets }}</div>
+        <div style="font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280;">Assets</div>
       </div>
-      {% endif %}
-      {% if report.portfolio.overlap_sectors %}
-      <div class="mt-2 flex flex-wrap gap-1">
-        <span class="text-xs text-amber-600 font-semibold">Committee–holding overlap:</span>
-        {% for s in report.portfolio.overlap_sectors %}
-        <span class="bg-amber-50 text-amber-700 text-xs px-2 py-0.5 rounded">{{ s | replace("_", " ") | title }}</span>
-        {% endfor %}
-      </div>
-      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ── 2. IDENTITY ──────────────────────────────────────────────────── -->
+<div class="card px-6 py-5 mb-6" style="display:flex; flex-wrap:wrap; gap:1.25rem; align-items:flex-start;">
+
+  <!-- Photo -->
+  <div style="flex-shrink:0; position:relative;">
+    <img
+      src="{{ report.member.profile_image_url }}"
+      alt="{{ report.member.full_name }}"
+      style="width:76px; height:76px; border-radius:0.5rem; object-fit:cover; border:1px solid #e5e7eb; display:block;"
+      onerror="if(this.dataset.fallback!=='1'){this.dataset.fallback='1';this.src='{{ report.member.profile_image_fallback_url }}';}else{this.style.display='none';this.nextElementSibling.style.display='flex';}">
+    <div style="width:76px; height:76px; border-radius:0.5rem; display:none; align-items:center; justify-content:center; font-size:1.5rem; font-weight:800; color:white;
+      {% if report.member.party == 'D' %}background:#2563eb;{% elif report.member.party == 'R' %}background:#dc2626;{% else %}background:#64748b;{% endif %}">
+      {{ report.member.initials }}
     </div>
   </div>
 
-  <!-- Key stats grid -->
-  <div class="grid grid-cols-3 sm:grid-cols-6 gap-3">
-    {% set stat_cells = [
-      (report.summary.max_score, "Signal Score",
-        "text-red-600" if report.summary.max_score >= 53
-        else ("text-amber-600" if report.summary.max_score >= 35 else "text-slate-500")),
-      (report.summary.high_confidence, "High Evidence", "text-red-600"),
-      (report.summary.total_conflicts, "Signals", "text-slate-800"),
-      (report.summary.total_assets, "Assets", "text-slate-600"),
-      (report.summary.total_transactions, "Trades", "text-blue-600"),
-      (report.voting.stats.total, "Votes Cast", "text-slate-500"),
+  <!-- Name + meta -->
+  <div style="flex:1; min-width:0;">
+    <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.25rem;">
+      <h1 style="font-family:Georgia,serif; font-size:1.5rem; font-weight:700; color:#111827; letter-spacing:-0.02em; margin:0;">{{ report.member.full_name }}</h1>
+      <span class="badge-{{ report.member.party }}">{{ report.member.party }}</span>
+    </div>
+    <div style="font-family:system-ui,sans-serif; font-size:0.85rem; color:#6b7280; margin-bottom:0.75rem;">
+      {{ report.member.display_title }} · {{ report.member.chamber | title }} · {{ report.member.state }}{% if report.member.district and report.member.district != 0 %}-{{ report.member.district }}{% endif %}
+      {% if report.member.bioguide_id %} · <span style="font-family:monospace; font-size:0.78rem; color:#9ca3af;">{{ report.member.bioguide_id }}</span>{% endif %}
+    </div>
+
+    <!-- Committees -->
+    {% if report.summary.committee_roles %}
+    <div style="display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.5rem;">
+      {% for c in report.summary.committee_roles %}
+      <span style="background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; font-size:0.72rem; padding:2px 8px; border-radius:4px; font-family:system-ui,sans-serif;"
+        title="{{ c.role }}{% if c.congress %} · Congress {{ c.congress }}{% endif %}">{{ c.committee_name }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Committee–holding overlap alert -->
+    {% if report.portfolio.overlap_sectors %}
+    <div style="display:flex; flex-wrap:wrap; gap:0.35rem; align-items:center;">
+      <span style="font-size:0.72rem; font-weight:700; color:#b45309; font-family:system-ui,sans-serif;">Committee–holding overlap:</span>
+      {% for s in report.portfolio.overlap_sectors %}
+      <span style="background:#fffbeb; border:1px solid #fcd34d; color:#92400e; font-size:0.72rem; padding:2px 8px; border-radius:4px; font-family:system-ui,sans-serif;">{{ s | replace("_", " ") | title }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Quick stats -->
+  <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:0.5rem; font-family:system-ui,sans-serif; flex-shrink:0;">
+    {% set qs = [
+      (report.voting.stats.total, "Votes"),
+      (report.summary.committee_count, "Committees"),
+      (report.legislation.sponsored_count, "Bills Sponsored"),
     ] %}
-    {% for val, label, color in stat_cells %}
-    <div class="text-center bg-slate-50 rounded-lg px-3 py-2">
-      <div class="text-xl font-bold {{ color }}">{{ val }}</div>
-      <div class="text-xs text-slate-400 mt-0.5">{{ label }}</div>
+    {% for val, lbl in qs %}
+    <div style="text-align:center; background:#f9fafb; border:1px solid #e5e7eb; border-radius:0.375rem; padding:0.5rem 0.75rem;">
+      <div style="font-size:1.1rem; font-weight:700; color:#374151;">{{ val }}</div>
+      <div style="font-size:0.62rem; text-transform:uppercase; letter-spacing:0.07em; color:#9ca3af; margin-top:1px;">{{ lbl }}</div>
     </div>
     {% endfor %}
   </div>
 </div>
 
-<!-- ── Identity + coverage row ────────────────────────────────────── -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
-  <details open class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-    <summary class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700 cursor-pointer list-none">Profile Data</summary>
-    <div class="px-5 py-4 space-y-3 text-sm">
-      <div>
-        <div class="text-xs uppercase tracking-wide text-slate-400 mb-1">Office</div>
-        <div class="text-slate-700">{{ report.member.display_title }} for {{ report.member.seat_label }}</div>
-      </div>
-      <div>
-        <div class="text-xs uppercase tracking-wide text-slate-400 mb-1">Primary IDs</div>
-        <div class="flex flex-wrap gap-2">
-          <span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded font-mono">BioGuide {{ report.member.bioguide_id }}</span>
-          {% if report.member.fec_candidate_id %}
-          <span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded font-mono">FEC {{ report.member.fec_candidate_id }}</span>
-          {% endif %}
-        </div>
-      </div>
-      {% if report.identity.grouped_identifiers %}
-      <div>
-        <div class="text-xs uppercase tracking-wide text-slate-400 mb-1">Crosswalk IDs</div>
-        <div class="space-y-1.5">
-          {% for id_type, values in report.identity.grouped_identifiers.items() %}
-          <div class="flex gap-2 items-start">
-            <div class="w-28 shrink-0 text-xs text-slate-400">{{ id_type | replace("_", " ") | title }}</div>
-            <div class="text-xs text-slate-700 break-all">{{ values | join(", ") }}</div>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-    </div>
-  </details>
+<!-- ── 3. DETECTED SIGNALS ──────────────────────────────────────────── -->
+{% if report.conflicts %}
+<div style="margin-bottom:2rem;">
+  <div class="section-header">
+    <span class="section-title">Detected Signals</span>
+    <span class="section-sub">{{ report.conflicts | length }} · sorted by score</span>
+  </div>
 
-  <details open class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-    <summary class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700 cursor-pointer list-none">Financial Snapshot</summary>
-    <div class="px-5 py-4 grid grid-cols-2 gap-3">
-      <div class="bg-slate-50 rounded-lg px-3 py-3">
-        <div class="text-xs text-slate-400 uppercase tracking-wide">Disclosed Assets</div>
-        <div class="text-xl font-bold text-slate-800 mt-1">{{ report.summary.total_assets }}</div>
-      </div>
-      <div class="bg-slate-50 rounded-lg px-3 py-3">
-        <div class="text-xs text-slate-400 uppercase tracking-wide">Reported Trades</div>
-        <div class="text-xl font-bold text-slate-800 mt-1">{{ report.summary.total_transactions }}</div>
-      </div>
-      <div class="bg-slate-50 rounded-lg px-3 py-3 col-span-2">
-        <div class="text-xs text-slate-400 uppercase tracking-wide">Portfolio Range</div>
-        <div class="text-sm font-medium text-slate-700 mt-1">
-          {% if report.portfolio.total_value_max %}
-          ${{ "{:,.0f}".format(report.portfolio.total_value_min) }} – ${{ "{:,.0f}".format(report.portfolio.total_value_max) }}
-          {% else %}
-          No disclosure-backed value data yet
-          {% endif %}
+  {% for c in report.conflicts %}
+  <div class="card mb-3 overflow-hidden {% if c.confidence == 'high' %}signal-high{% elif c.confidence == 'medium' %}signal-medium{% else %}signal-low{% endif %}">
+    <div style="padding:1rem 1.25rem;">
+      <!-- Top row -->
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:0.6rem; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+          <span class="conf-{{ c.confidence }}">{{ c.score }}</span>
+          <span style="font-size:0.7rem; font-weight:700; color:#15803d; text-transform:uppercase; letter-spacing:0.07em; font-family:system-ui,sans-serif;">{{ c.conflict_type | replace("_", " ") | title }}</span>
+        </div>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; font-family:system-ui,sans-serif; font-size:0.72rem; color:#9ca3af;">
+          {% if c.bill_id %}<span style="font-family:monospace; background:#f3f4f6; padding:1px 6px; border-radius:3px; color:#374151;">{{ c.bill_id }}</span>{% endif %}
+          {% if c.vote_id %}<span style="font-family:monospace; background:#f3f4f6; padding:1px 6px; border-radius:3px; color:#374151;">{{ c.vote_id }}</span>{% endif %}
+          {% if c.detail and c.detail.ticker %}<span style="font-family:monospace; font-weight:700; background:#eff6ff; color:#1d4ed8; padding:1px 6px; border-radius:3px;">{{ c.detail.ticker }}</span>{% endif %}
         </div>
       </div>
-    </div>
-  </details>
 
-  <details open class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-    <summary class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700 cursor-pointer list-none">Congressional Snapshot</summary>
-    <div class="px-5 py-4 grid grid-cols-2 gap-3">
-      <div class="bg-slate-50 rounded-lg px-3 py-3">
-        <div class="text-xs text-slate-400 uppercase tracking-wide">Votes Loaded</div>
-        <div class="text-xl font-bold text-slate-800 mt-1">{{ report.voting.stats.total }}</div>
-      </div>
-      <div class="bg-slate-50 rounded-lg px-3 py-3">
-        <div class="text-xs text-slate-400 uppercase tracking-wide">Committees</div>
-        <div class="text-xl font-bold text-slate-800 mt-1">{{ report.summary.committee_count }}</div>
-      </div>
-      <div class="bg-slate-50 rounded-lg px-3 py-3">
-        <div class="text-xs text-slate-400 uppercase tracking-wide">Sponsored</div>
-        <div class="text-xl font-bold text-slate-800 mt-1">{{ report.legislation.sponsored_count }}</div>
-      </div>
-      <div class="bg-slate-50 rounded-lg px-3 py-3">
-        <div class="text-xs text-slate-400 uppercase tracking-wide">Cosponsored</div>
-        <div class="text-xl font-bold text-slate-800 mt-1">{{ report.legislation.cosponsored_count }}</div>
+      <!-- Evidence text — always fully visible -->
+      <p style="font-family:Georgia,serif; font-size:0.88rem; color:#1f2937; line-height:1.65; margin:0 0 0.5rem 0;">{{ c.evidence_summary or "No evidence summary available." }}</p>
+
+      <!-- Asset detail + event date -->
+      <div style="font-family:system-ui,sans-serif; font-size:0.75rem; color:#6b7280; display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.25rem;">
+        {% if c.detail %}
+          {% if c.detail.asset_name %}<span>{{ c.detail.asset_name }}</span>{% endif %}
+          {% if c.detail.value_max %}<span>≤ ${{ "{:,.0f}".format(c.detail.value_max) }}</span>{% endif %}
+          {% if c.detail.evidence_tier %}<span style="color:#9ca3af;">Tier: {{ c.detail.evidence_tier }}</span>{% endif %}
+        {% endif %}
+        {% if c.event_date %}<span style="margin-left:auto; color:#9ca3af;">{{ c.event_date }}</span>{% endif %}
       </div>
     </div>
-  </details>
+  </div>
+  {% endfor %}
 </div>
 
-<!-- ── Campaign funding ───────────────────────────────────────────── -->
-<details open class="bg-white border border-slate-200 rounded-xl shadow-sm mb-5 overflow-hidden">
-  <summary class="px-5 py-4 border-b border-slate-100 flex items-center justify-between cursor-pointer list-none">
-    <div class="font-semibold text-sm text-slate-700">
-      Campaign Funding
-      <span class="ml-2 text-xs text-slate-400 font-normal">{{ report.funding.count }} contribution records</span>
+{% else %}
+<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.5rem; padding:2.5rem; text-align:center; margin-bottom:2rem;">
+  <div style="font-family:Georgia,serif; font-size:1rem; font-weight:700; color:#166534; margin-bottom:0.25rem;">No signals detected</div>
+  <div style="font-family:system-ui,sans-serif; font-size:0.82rem; color:#4ade80; color:#6b7280;">No significant public-data overlap identified in the current dataset.</div>
+</div>
+{% endif %}
+
+<!-- ── 4. ACTIVITY: TRADES + VOTES ──────────────────────────────────── -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+  <!-- Recent trades -->
+  <div>
+    <div class="section-header">
+      <span class="section-title">Stock Trades</span>
+      <span class="section-sub">STOCK Act · {{ report.recent_transactions | length }} shown</span>
+      {% if report.trading %}
+      <span style="font-family:system-ui,sans-serif; font-size:0.72rem; margin-left:auto;">
+        <span style="color:#16a34a; font-weight:600;">↑ {{ report.trading.buy_count }}</span>
+        <span style="color:#9ca3af; margin:0 0.2rem;">·</span>
+        <span style="color:#dc2626; font-weight:600;">↓ {{ report.trading.sell_count }}</span>
+      </span>
+      {% endif %}
     </div>
-    {% if report.coverage.latest_contribution_date %}
-    <div class="text-xs text-slate-400">Latest: {{ report.coverage.latest_contribution_date }}</div>
+
+    {% if report.recent_transactions %}
+    <div class="card overflow-hidden">
+      <div style="max-height:340px; overflow-y:auto;">
+        {% for t in report.recent_transactions %}
+        <div style="display:flex; align-items:baseline; gap:0.75rem; padding:0.625rem 1rem; {% if not loop.last %}border-bottom:1px solid #f9fafb;{% endif %} font-family:system-ui,sans-serif; font-size:0.8rem;"
+          onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+          <div style="flex-shrink:0; width:72px; color:#9ca3af; font-size:0.72rem;">{{ t.transaction_date or "—" }}</div>
+          <div style="flex-shrink:0; width:56px; font-family:monospace; font-weight:700; color:#111827; font-size:0.82rem;">{{ t.ticker or "—" }}</div>
+          <div style="flex:1; min-width:0; color:#374151; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ t.asset_name }}">{{ t.asset_name or "—" }}</div>
+          <div style="flex-shrink:0;">
+            {% if t.transaction_type == "purchase" %}<span style="color:#16a34a; font-weight:600;">↑ Buy</span>
+            {% elif "sale" in (t.transaction_type or "") %}<span style="color:#dc2626; font-weight:600;">↓ Sell</span>
+            {% else %}<span style="color:#9ca3af;">{{ t.transaction_type or "—" }}</span>{% endif %}
+          </div>
+          <div style="flex-shrink:0; color:#6b7280; font-size:0.72rem; text-align:right; min-width:80px;">
+            {% if t.amount_min %}${{ "{:,.0f}".format(t.amount_min) }}{% endif %}
+            {% if t.amount_max %} – ${{ "{:,.0f}".format(t.amount_max) }}{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div class="card px-5 py-8 text-center" style="font-family:system-ui,sans-serif; font-size:0.82rem; color:#9ca3af;">No trades on record.</div>
     {% endif %}
-  </summary>
-
-  {% if report.funding.count > 0 %}
-  <div class="p-5 border-b border-slate-100">
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
-      <div class="bg-slate-50 rounded-lg px-3 py-3">
-        <div class="text-xs text-slate-400 uppercase tracking-wide">Total Raised</div>
-        <div class="text-xl font-bold text-slate-800 mt-1">${{ "{:,.0f}".format(report.funding.total_amount) }}</div>
-      </div>
-      <div class="bg-slate-50 rounded-lg px-3 py-3">
-        <div class="text-xs text-slate-400 uppercase tracking-wide">PAC Money</div>
-        <div class="text-xl font-bold text-indigo-600 mt-1">${{ "{:,.0f}".format(report.funding.mix.pac.amount) }}</div>
-      </div>
-      <div class="bg-slate-50 rounded-lg px-3 py-3">
-        <div class="text-xs text-slate-400 uppercase tracking-wide">Individuals</div>
-        <div class="text-xl font-bold text-slate-800 mt-1">${{ "{:,.0f}".format(report.funding.mix.individual.amount) }}</div>
-      </div>
-      <div class="bg-slate-50 rounded-lg px-3 py-3">
-        <div class="text-xs text-slate-400 uppercase tracking-wide">Grassroots</div>
-        <div class="text-xl font-bold text-green-600 mt-1">${{ "{:,.0f}".format(report.funding.mix.grassroots.amount) }}</div>
-      </div>
-      <div class="bg-slate-50 rounded-lg px-3 py-3">
-        <div class="text-xs text-slate-400 uppercase tracking-wide">Large Donors</div>
-        <div class="text-xl font-bold text-red-600 mt-1">${{ "{:,.0f}".format(report.funding.mix.large.amount) }}</div>
-      </div>
-    </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 p-5">
-    <div class="lg:col-span-2">
-      <div class="text-xs text-slate-400 uppercase tracking-wide font-semibold mb-3">Top Funding Industries / Sectors</div>
-      <div class="space-y-3">
-        {% for industry in report.funding.top_industries %}
-        <div>
-          <div class="flex items-center justify-between gap-3 mb-1">
-            <div class="text-sm text-slate-700 truncate">{{ industry.label }}</div>
-            <div class="text-xs text-slate-400 whitespace-nowrap">${{ "{:,.0f}".format(industry.amount) }} · {{ industry.share_pct }}%</div>
+  <!-- Recent votes -->
+  <div>
+    <div class="section-header">
+      <span class="section-title">Recent Votes</span>
+      <span class="section-sub">{{ report.voting.recent | length }} shown</span>
+      {% if report.voting.stats.total > 0 %}
+      <span style="font-family:system-ui,sans-serif; font-size:0.72rem; font-weight:600; color:#15803d; margin-left:auto;">{{ report.voting.stats.participation_rate }}% participation</span>
+      {% endif %}
+    </div>
+
+    {% if report.voting.recent %}
+    <div class="card overflow-hidden">
+      <div style="max-height:340px; overflow-y:auto;">
+        {% for v in report.voting.recent %}
+        <div style="display:flex; align-items:flex-start; gap:0.6rem; padding:0.625rem 1rem; {% if not loop.last %}border-bottom:1px solid #f9fafb;{% endif %} font-family:system-ui,sans-serif; font-size:0.8rem;"
+          onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+          <span style="flex-shrink:0; margin-top:1px; font-size:0.7rem; font-weight:700; padding:1px 6px; border-radius:3px;
+            {% if v.position == 'Yea' %}background:#dcfce7; color:#166534;
+            {% elif v.position == 'Nay' %}background:#fee2e2; color:#b91c1c;
+            {% else %}background:#f3f4f6; color:#6b7280;{% endif %}">{{ v.position }}</span>
+          <div style="flex:1; min-width:0;">
+            <div style="color:#374151; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ v.bill_title or v.question }}">{{ v.bill_title or v.question or v.vote_id }}</div>
+            <div style="font-size:0.7rem; color:#9ca3af; margin-top:1px; display:flex; gap:0.5rem;">
+              {% if v.policy_area %}<span style="color:#15803d;">{{ v.policy_area }}</span>{% endif %}
+              <span>{{ v.vote_date or "—" }}</span>
+            </div>
           </div>
-          <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-            <div class="bg-blue-500 h-2 rounded-full" style="width: {{ industry.share_pct }}%"></div>
-          </div>
-          <div class="mt-1 text-[11px] text-slate-400">{{ industry.count }} contributions</div>
         </div>
         {% endfor %}
       </div>
     </div>
+    {% else %}
+    <div class="card px-5 py-8 text-center" style="font-family:system-ui,sans-serif; font-size:0.82rem; color:#9ca3af;">No vote records.</div>
+    {% endif %}
+  </div>
+</div>
 
-    <div>
-      <div class="text-xs text-slate-400 uppercase tracking-wide font-semibold mb-3">Donor Mix</div>
-      <div class="space-y-3">
-        {% set total_funding = report.funding.total_amount or 1 %}
-        {% set funding_buckets = [
-          ("PACs", report.funding.mix.pac.amount, report.funding.mix.pac.count, "bg-indigo-500"),
-          ("Grassroots", report.funding.mix.grassroots.amount, report.funding.mix.grassroots.count, "bg-green-500"),
-          ("Mid-Size", report.funding.mix.mid.amount, report.funding.mix.mid.count, "bg-amber-500"),
-          ("Large Donors", report.funding.mix.large.amount, report.funding.mix.large.count, "bg-red-500"),
-        ] %}
-        {% for label, amount, count, bar_color in funding_buckets %}
-        {% set share = ((amount / total_funding) * 100) if report.funding.total_amount else 0 %}
-        <div class="bg-slate-50 rounded-lg px-3 py-3">
-          <div class="flex items-center justify-between gap-2">
-            <div class="text-sm text-slate-700">{{ label }}</div>
-            <div class="text-xs text-slate-400">{{ count }} records</div>
-          </div>
-          <div class="mt-1 text-lg font-bold text-slate-800">${{ "{:,.0f}".format(amount) }}</div>
-          <div class="mt-2 w-full bg-white rounded-full h-2 overflow-hidden">
-            <div class="{{ bar_color }} h-2 rounded-full" style="width: {{ share|round(1) }}%"></div>
-          </div>
-          <div class="mt-1 text-[11px] text-slate-400">{{ share|round(1) }}% of tracked funding</div>
+<!-- ── 5. PORTFOLIO ─────────────────────────────────────────────────── -->
+<div style="margin-bottom:2rem;">
+  <div class="section-header">
+    <span class="section-title">Portfolio</span>
+    {% if report.portfolio.total_value_max %}
+    <span class="section-sub">${{ "{:,.0f}".format(report.portfolio.total_value_min) }} – ${{ "{:,.0f}".format(report.portfolio.total_value_max) }} estimated</span>
+    {% endif %}
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+    <!-- Sector chart -->
+    <div class="card px-5 py-4 lg:col-span-2">
+      <div class="data-label mb-3">By Sector (est. max value)</div>
+      {% if report.portfolio.by_sector %}
+      <canvas id="sectorChart" height="160"></canvas>
+      {% else %}
+      <div style="text-align:center; padding:2rem; color:#9ca3af; font-family:system-ui,sans-serif; font-size:0.82rem;">No asset data.</div>
+      {% endif %}
+    </div>
+    <!-- Type donut + voting -->
+    <div style="display:flex; flex-direction:column; gap:1rem;">
+      <div class="card px-4 py-4 flex-1">
+        <div class="data-label mb-2">Asset Types</div>
+        {% if report.portfolio.by_type %}
+        <canvas id="typeChart" height="130"></canvas>
+        {% else %}
+        <div style="text-align:center; padding:1.5rem; color:#9ca3af; font-family:system-ui,sans-serif; font-size:0.82rem;">No data.</div>
+        {% endif %}
+      </div>
+      <div class="card px-4 py-4 flex-1">
+        <div class="data-label mb-2">Voting Participation</div>
+        {% set vs = report.voting.stats %}
+        {% if vs.total > 0 %}
+        <div style="display:flex; align-items:baseline; gap:0.5rem; margin-bottom:0.5rem;">
+          <span style="font-family:Georgia,serif; font-size:1.6rem; font-weight:800; color:#166534;">{{ vs.participation_rate }}%</span>
+          <span style="font-family:system-ui,sans-serif; font-size:0.75rem; color:#9ca3af;">participation</span>
         </div>
-        {% endfor %}
+        <div style="display:flex; border-radius:999px; overflow:hidden; height:8px; background:#f3f4f6; margin-bottom:0.5rem;">
+          {% if vs.Yea %}<div style="background:#16a34a; height:8px; width:{{ (vs.Yea / vs.total * 100) | round }}%;"></div>{% endif %}
+          {% if vs.Nay %}<div style="background:#dc2626; height:8px; width:{{ (vs.Nay / vs.total * 100) | round }}%;"></div>{% endif %}
+          {% if vs['Not Voting'] %}<div style="background:#e5e7eb; height:8px; width:{{ (vs['Not Voting'] / vs.total * 100) | round }}%;"></div>{% endif %}
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); text-align:center; font-family:system-ui,sans-serif; font-size:0.75rem;">
+          <div><div style="font-weight:700; color:#16a34a;">{{ vs.Yea }}</div><div style="color:#9ca3af;">Yea</div></div>
+          <div><div style="font-weight:700; color:#dc2626;">{{ vs.Nay }}</div><div style="color:#9ca3af;">Nay</div></div>
+          <div><div style="font-weight:700; color:#9ca3af;">{{ vs['Not Voting'] }}</div><div style="color:#9ca3af;">Absent</div></div>
+        </div>
+        {% else %}
+        <div style="text-align:center; padding:1rem; color:#9ca3af; font-family:system-ui,sans-serif; font-size:0.82rem;">No vote data.</div>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  {% if report.funding.top_donors %}
-  <div class="border-t border-slate-100 px-5 py-4">
-    <div class="text-xs text-slate-400 uppercase tracking-wide font-semibold mb-3">Largest Tracked Donors</div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-xs">
-        <thead class="bg-slate-50 border-b border-slate-100">
-          <tr class="text-slate-500 uppercase tracking-wide">
-            <th class="px-4 py-2.5 text-left font-semibold">Donor</th>
-            <th class="px-4 py-2.5 text-left font-semibold">Industry</th>
-            <th class="px-4 py-2.5 text-left font-semibold">Type</th>
-            <th class="px-4 py-2.5 text-left font-semibold">Records</th>
-            <th class="px-4 py-2.5 text-left font-semibold">Amount</th>
+  <!-- Top holdings table -->
+  {% if report.portfolio.top_holdings %}
+  <div class="card overflow-hidden">
+    <div style="padding:0.75rem 1.25rem; border-bottom:1px solid #f3f4f6; font-family:system-ui,sans-serif; font-size:0.78rem; font-weight:600; color:#374151;">Top Holdings</div>
+    <div style="overflow-x:auto; max-height:260px; overflow-y:auto;">
+      <table style="width:100%; border-collapse:collapse; font-family:system-ui,sans-serif; font-size:0.78rem;">
+        <thead style="position:sticky; top:0; background:#f9fafb;">
+          <tr style="border-bottom:1px solid #e5e7eb;">
+            <th style="padding:0.4rem 1rem; text-align:left; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Asset</th>
+            <th style="padding:0.4rem 0.75rem; text-align:left; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Ticker</th>
+            <th style="padding:0.4rem 0.75rem; text-align:left; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Sector</th>
+            <th style="padding:0.4rem 0.75rem; text-align:right; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Est. Value</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-slate-50">
-          {% for donor in report.funding.top_donors %}
-          <tr class="hover:bg-slate-50">
-            <td class="px-4 py-2 text-slate-700">{{ donor.name }}</td>
-            <td class="px-4 py-2 text-slate-500">{{ donor.industry }}</td>
-            <td class="px-4 py-2 text-slate-400 capitalize">{{ donor.type or "—" }}</td>
-            <td class="px-4 py-2 text-slate-400">{{ donor.count }}</td>
-            <td class="px-4 py-2 text-slate-700 font-medium">${{ "{:,.0f}".format(donor.amount) }}</td>
+        <tbody>
+          {% for a in report.portfolio.top_holdings %}
+          <tr style="border-bottom:1px solid #f9fafb;" onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background=''">
+            <td style="padding:0.5rem 1rem; color:#374151; max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ a.asset_name }}">{{ a.asset_name }}</td>
+            <td style="padding:0.5rem 0.75rem; font-family:monospace; font-weight:700; color:#111827;">{{ a.ticker or "—" }}</td>
+            <td style="padding:0.5rem 0.75rem;">
+              <span style="background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; font-size:0.7rem; padding:1px 6px; border-radius:3px;">{{ (a.sector or "unknown") | replace("_", " ") | title }}</span>
+            </td>
+            <td style="padding:0.5rem 0.75rem; text-align:right; color:#374151;">
+              {% if a.value_max %}<span style="font-weight:600;">${{ "{:,.0f}".format(a.value_max) }}</span>{% else %}—{% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -285,347 +333,141 @@
     </div>
   </div>
   {% endif %}
+</div>
 
-  <div class="border-t border-slate-100 px-5 py-4 text-xs text-slate-400 leading-relaxed">
-    Funding heuristics:
-    grassroots = {{ report.funding.notes.grassroots_definition }}
-    large donors = {{ report.funding.notes.large_definition }}
-    sector view = {{ report.funding.notes.sector_definition }}
+<!-- ── 6. CAMPAIGN FUNDING ──────────────────────────────────────────── -->
+<details class="card mb-5 overflow-hidden" {% if report.funding.count > 0 %}open{% endif %}>
+  <summary style="padding:0.875rem 1.25rem; border-bottom:1px solid #f3f4f6; cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; font-family:system-ui,sans-serif;">
+    <span style="font-family:Georgia,serif; font-size:1rem; font-weight:700; color:#166534;">Campaign Funding</span>
+    <span style="font-size:0.75rem; color:#9ca3af;">{{ report.funding.count }} contribution records {% if report.coverage.latest_contribution_date %}· {{ report.coverage.latest_contribution_date }}{% endif %}</span>
+  </summary>
+
+  {% if report.funding.count > 0 %}
+  <div style="padding:1.25rem;">
+    <!-- Funding stats -->
+    <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:0.5rem; margin-bottom:1.25rem; font-family:system-ui,sans-serif;">
+      {% set funding_stat_cells = [
+        ("Total Raised",  report.funding.total_amount,        "#166534"),
+        ("PAC Money",     report.funding.mix.pac.amount,      "#4f46e5"),
+        ("Individual",    report.funding.mix.individual.amount,"#374151"),
+        ("Large Donors",  report.funding.mix.large.amount,    "#b91c1c"),
+      ] %}
+      {% for lbl, amt, clr in funding_stat_cells %}
+      <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:0.375rem; padding:0.625rem 0.875rem;">
+        <div style="font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#9ca3af; margin-bottom:2px;">{{ lbl }}</div>
+        <div style="font-size:1.2rem; font-weight:800; color:{{ clr }};">${{ "{:,.0f}".format(amt) }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Top industries -->
+    {% if report.funding.top_industries %}
+    <div class="data-label mb-2">Top Funding Industries</div>
+    <div style="margin-bottom:1rem;">
+      {% for industry in report.funding.top_industries %}
+      <div style="margin-bottom:0.625rem;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:3px; font-family:system-ui,sans-serif; font-size:0.78rem;">
+          <span style="color:#374151;">{{ industry.label }}</span>
+          <span style="color:#9ca3af;">${{ "{:,.0f}".format(industry.amount) }} · {{ industry.share_pct }}%</span>
+        </div>
+        <div style="background:#f3f4f6; border-radius:999px; height:6px; overflow:hidden;">
+          <div style="background:#15803d; height:6px; border-radius:999px; width:{{ industry.share_pct }}%;"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Top donors -->
+    {% if report.funding.top_donors %}
+    <div class="data-label mb-2">Largest Tracked Donors</div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-family:system-ui,sans-serif; font-size:0.78rem;">
+        <thead>
+          <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
+            <th style="padding:0.4rem 0.75rem; text-align:left; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Donor</th>
+            <th style="padding:0.4rem 0.75rem; text-align:left; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Industry</th>
+            <th style="padding:0.4rem 0.75rem; text-align:right; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for donor in report.funding.top_donors %}
+          <tr style="border-bottom:1px solid #f9fafb;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+            <td style="padding:0.45rem 0.75rem; color:#374151;">{{ donor.name }}</td>
+            <td style="padding:0.45rem 0.75rem; color:#6b7280;">{{ donor.industry }}</td>
+            <td style="padding:0.45rem 0.75rem; text-align:right; font-weight:600; color:#374151;">${{ "{:,.0f}".format(donor.amount) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
   </div>
   {% else %}
-  <div class="px-5 py-10 text-center text-slate-400 text-sm">
-    No campaign contribution data has been ingested for this member yet.
-    The profile section is ready, but `core.campaign_contributions` is currently empty in the live database.
+  <div style="padding:2.5rem; text-align:center; font-family:system-ui,sans-serif; font-size:0.82rem; color:#9ca3af;">
+    No campaign contribution data ingested for this member yet.
   </div>
   {% endif %}
 </details>
 
-<!-- ── Portfolio + Voting row ──────────────────────────────────────── -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
-
-  <!-- Portfolio value + sector chart -->
-  <div class="lg:col-span-2 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-      <div class="font-semibold text-sm text-slate-700">Portfolio Breakdown</div>
-      {% if report.portfolio.total_value_max %}
-      <div class="text-xs text-slate-400">
-        Est. value: ${{ "{:,.0f}".format(report.portfolio.total_value_min) }} – ${{ "{:,.0f}".format(report.portfolio.total_value_max) }}
-      </div>
-      {% endif %}
-    </div>
-    {% if report.portfolio.by_sector %}
-    <div class="px-5 py-4">
-      <div class="text-xs text-slate-400 uppercase tracking-wide font-semibold mb-3">By Sector (est. max value)</div>
-      <canvas id="sectorChart" height="160"></canvas>
-    </div>
-    {% else %}
-    <div class="px-5 py-10 text-center text-slate-400 text-sm">No asset data on record.</div>
-    {% endif %}
-  </div>
-
-  <!-- Asset type breakdown + voting participation -->
-  <div class="flex flex-col gap-5">
-
-    <!-- Asset type donut -->
-    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1">
-      <div class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700">Asset Types</div>
-      {% if report.portfolio.by_type %}
-      <div class="px-5 py-3">
-        <canvas id="typeChart" height="130"></canvas>
-      </div>
-      {% else %}
-      <div class="px-5 py-8 text-center text-slate-400 text-sm">No data.</div>
-      {% endif %}
-    </div>
-
-    <!-- Voting participation -->
-    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1">
-      <div class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700">Voting Participation</div>
-      <div class="px-5 py-4">
-        {% set vs = report.voting.stats %}
-        {% if vs.total > 0 %}
-        <div class="flex items-center gap-2 mb-3">
-          <div class="text-2xl font-bold text-slate-800">{{ vs.participation_rate }}%</div>
-          <div class="text-xs text-slate-400">participation rate</div>
+<!-- ── 7. SPONSORED LEGISLATION ─────────────────────────────────────── -->
+{% if report.legislation.sponsored %}
+<details class="card mb-5 overflow-hidden">
+  <summary style="padding:0.875rem 1.25rem; border-bottom:1px solid #f3f4f6; cursor:pointer; list-style:none; display:flex; align-items:center; gap:0.5rem; font-family:system-ui,sans-serif;">
+    <span style="font-family:Georgia,serif; font-size:1rem; font-weight:700; color:#166534;">Sponsored Legislation</span>
+    <span style="font-size:0.75rem; color:#9ca3af;">{{ report.legislation.sponsored_count }} sponsored · {{ report.legislation.cosponsored_count }} cosponsored</span>
+  </summary>
+  <div style="max-height:280px; overflow-y:auto;">
+    {% for bill in report.legislation.sponsored %}
+    <div style="padding:0.625rem 1.25rem; {% if not loop.last %}border-bottom:1px solid #f9fafb;{% endif %} font-family:system-ui,sans-serif;"
+      onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:0.75rem;">
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:0.72rem; font-family:monospace; color:#9ca3af; margin-bottom:2px;">{{ bill.bill_id }}</div>
+          <div style="font-size:0.82rem; color:#374151; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ bill.title }}">{{ bill.short_title or bill.title or "Untitled" }}</div>
         </div>
-        <!-- Progress bar: Yea | Nay | Not Voting -->
-        {% set total = vs.total %}
-        <div class="flex rounded-full overflow-hidden h-3 mb-3 bg-slate-100">
-          {% if vs.Yea %}<div class="bg-green-500 h-3" style="width:{{ (vs.Yea / total * 100) | round }}%"></div>{% endif %}
-          {% if vs.Nay %}<div class="bg-red-400 h-3" style="width:{{ (vs.Nay / total * 100) | round }}%"></div>{% endif %}
-          {% if vs['Not Voting'] %}<div class="bg-slate-300 h-3" style="width:{{ (vs['Not Voting'] / total * 100) | round }}%"></div>{% endif %}
-        </div>
-        <div class="grid grid-cols-3 gap-1 text-center text-xs">
-          <div><div class="font-bold text-green-600">{{ vs.Yea }}</div><div class="text-slate-400">Yea</div></div>
-          <div><div class="font-bold text-red-500">{{ vs.Nay }}</div><div class="text-slate-400">Nay</div></div>
-          <div><div class="font-bold text-slate-400">{{ vs['Not Voting'] }}</div><div class="text-slate-400">Absent</div></div>
-        </div>
-        {% else %}
-        <div class="text-center text-slate-400 text-sm py-4">No vote data.</div>
+        {% if bill.policy_area %}
+        <span style="flex-shrink:0; font-size:0.7rem; background:#f3f4f6; color:#6b7280; padding:2px 7px; border-radius:3px;">{{ bill.policy_area }}</span>
         {% endif %}
       </div>
+      {% if bill.introduced_date %}
+      <div style="font-size:0.7rem; color:#9ca3af; margin-top:3px;">Introduced {{ bill.introduced_date }}</div>
+      {% endif %}
     </div>
-
-  </div>
-</div>
-
-<!-- ── Top holdings ────────────────────────────────────────────────── -->
-{% if report.portfolio.top_holdings %}
-<details open class="bg-white border border-slate-200 rounded-xl shadow-sm mb-5 overflow-hidden">
-  <summary class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700 cursor-pointer list-none">
-    Top Holdings
-    <span class="ml-2 text-xs text-slate-400 font-normal">by disclosed value</span>
-  </summary>
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="text-xs text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-100">
-          <th class="px-5 py-3 text-left font-semibold">Asset</th>
-          <th class="px-5 py-3 text-left font-semibold">Ticker</th>
-          <th class="px-5 py-3 text-left font-semibold">Sector</th>
-          <th class="px-5 py-3 text-left font-semibold">Type</th>
-          <th class="px-5 py-3 text-left font-semibold">Est. Value</th>
-          <th class="px-5 py-3 text-left font-semibold">Owner</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-50">
-        {% for a in report.portfolio.top_holdings %}
-        <tr class="hover:bg-slate-50">
-          <td class="px-5 py-3 text-slate-700 max-w-xs truncate" title="{{ a.asset_name }}">{{ a.asset_name }}</td>
-          <td class="px-5 py-3 font-mono font-bold text-slate-800">{{ a.ticker or "—" }}</td>
-          <td class="px-5 py-3 text-xs">
-            {% if a.sector %}
-            <span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded">{{ a.sector | replace("_", " ") | title }}</span>
-            {% else %}—{% endif %}
-          </td>
-          <td class="px-5 py-3 text-slate-500 capitalize text-xs">{{ a.asset_type or "—" }}</td>
-          <td class="px-5 py-3 text-slate-600">
-            {% if a.value_max %}<span class="font-medium">${{ "{:,.0f}".format(a.value_max) }}</span>{% endif %}
-            {% if a.value_min and a.value_min != a.value_max %}
-            <span class="text-slate-400 text-xs"> (min ${{ "{:,.0f}".format(a.value_min) }})</span>
-            {% endif %}
-          </td>
-          <td class="px-5 py-3 text-slate-400 capitalize text-xs">{{ a.owner or "self" }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {% endfor %}
   </div>
 </details>
 {% endif %}
 
-<!-- ── Conflicts ───────────────────────────────────────────────────── -->
-{% if not report.conflicts %}
-<div class="bg-green-50 border border-green-200 rounded-xl px-6 py-10 text-center mb-5">
-  <div class="text-3xl mb-2">✅</div>
-  <div class="text-green-800 font-semibold">No signals detected</div>
-  <div class="text-green-600 text-sm mt-1">No significant public-data overlap was identified in the current dataset.</div>
-</div>
-{% else %}
-<details open class="bg-white border border-slate-200 rounded-xl shadow-sm mb-5 overflow-hidden">
-  <summary class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700 cursor-pointer list-none">
-    Detected Signals
-    <span class="ml-2 text-xs text-slate-400 font-normal">{{ report.conflicts | length }} records · sorted by signal score</span>
-  </summary>
-  <div class="overflow-x-auto max-h-96">
-    <table class="w-full text-sm">
-      <thead class="sticky top-0 bg-slate-50 border-b border-slate-100">
-        <tr class="text-xs text-slate-500 uppercase tracking-wide">
-          <th class="px-5 py-3 text-left font-semibold">Signal Score</th>
-          <th class="px-5 py-3 text-left font-semibold">Type</th>
-          <th class="px-5 py-3 text-left font-semibold">Evidence</th>
-          <th class="px-5 py-3 text-left font-semibold">Bill / Vote</th>
-          <th class="px-5 py-3 text-left font-semibold">Asset / Ticker</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-50">
-        {% for c in report.conflicts %}
-        <tr class="hover:bg-slate-50">
-          <td class="px-5 py-3">
-            <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold conf-{{ c.confidence }}">{{ c.score }}</span>
-          </td>
-          <td class="px-5 py-3">
-            <span class="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded font-medium">{{ c.conflict_type | replace("_", " ") | title }}</span>
-          </td>
-          <td class="px-5 py-3 text-slate-600 text-xs max-w-xs">
-            <details>
-              <summary class="cursor-pointer list-none hover:text-slate-700">
-                {{ (c.evidence_summary or "No evidence summary")[:90] }}{% if c.evidence_summary and c.evidence_summary|length > 90 %}…{% endif %}
-              </summary>
-              <div class="mt-2 leading-relaxed text-slate-600">{{ c.evidence_summary or "—" }}</div>
-              <div class="mt-2 text-[11px] text-slate-500">Evidence confidence: {{ c.confidence | title }} · reflects evidence quality, not legal certainty.</div>
-              {% if c.detail.evidence_tier %}
-              <div class="mt-1 text-[11px] text-slate-500">Evidence tier: {{ c.detail.evidence_tier }}</div>
-              {% endif %}
-            </details>
-          </td>
-          <td class="px-5 py-3 text-xs text-slate-400 font-mono">
-            {% if c.bill_id %}<div>{{ c.bill_id }}</div>{% endif %}
-            {% if c.vote_id %}<div>{{ c.vote_id }}</div>{% endif %}
-          </td>
-          <td class="px-5 py-3 text-xs">
-            {% if c.detail %}
-              {% if c.detail.ticker %}<div class="font-mono font-bold text-slate-800">{{ c.detail.ticker }}</div>{% endif %}
-              {% if c.detail.asset_name %}<div class="text-slate-500 truncate max-w-[160px]" title="{{ c.detail.asset_name }}">{{ c.detail.asset_name }}</div>{% endif %}
-              {% if c.detail.value_max %}<div class="text-slate-400">≤ ${{ "{:,.0f}".format(c.detail.value_max) }}</div>{% endif %}
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</details>
-{% endif %}
-
-<!-- ── Legislation + Trading side by side ─────────────────────────── -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-
-  <!-- Sponsored bills -->
-  <details open class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-    <summary class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700 cursor-pointer list-none">
-      Sponsored Legislation
-      <span class="ml-2 text-xs text-slate-400 font-normal">
-        {{ report.legislation.sponsored_count }} sponsored · {{ report.legislation.cosponsored_count }} cosponsored
-      </span>
-    </summary>
-    {% if report.legislation.sponsored %}
-    <div class="divide-y divide-slate-50 max-h-80 overflow-y-auto">
-      {% for bill in report.legislation.sponsored %}
-      <div class="px-5 py-3 hover:bg-slate-50">
-        <div class="flex items-start justify-between gap-2">
-          <div class="flex-1 min-w-0">
-            <div class="text-xs font-mono text-slate-400 mb-0.5">{{ bill.bill_id }}</div>
-            <div class="text-sm text-slate-700 leading-snug truncate" title="{{ bill.title }}">{{ bill.short_title or bill.title or "Untitled" }}</div>
-          </div>
-          {% if bill.policy_area %}
-          <span class="shrink-0 text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">{{ bill.policy_area }}</span>
-          {% endif %}
-        </div>
-        {% if bill.introduced_date %}
-        <div class="text-xs text-slate-400 mt-1">Introduced {{ bill.introduced_date }}</div>
-        {% endif %}
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="px-5 py-10 text-center text-slate-400 text-sm">No sponsored bills on record.</div>
-    {% endif %}
-  </details>
-
-  <!-- Recent votes -->
-  <details open class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-    <summary class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700 cursor-pointer list-none">
-      Recent Votes
-      <span class="ml-2 text-xs text-slate-400 font-normal">last {{ report.voting.recent | length }}</span>
-    </summary>
-    {% if report.voting.recent %}
-    <div class="divide-y divide-slate-50 max-h-80 overflow-y-auto">
-      {% for v in report.voting.recent %}
-      <div class="px-5 py-3 hover:bg-slate-50 flex items-start gap-3">
-        <span class="shrink-0 mt-0.5 text-xs font-bold px-1.5 py-0.5 rounded
-          {% if v.position == 'Yea' %}bg-green-100 text-green-700
-          {% elif v.position == 'Nay' %}bg-red-100 text-red-600
-          {% else %}bg-slate-100 text-slate-400{% endif %}">
-          {{ v.position }}
-        </span>
-        <div class="flex-1 min-w-0">
-          <div class="text-xs text-slate-600 truncate leading-snug" title="{{ v.bill_title or v.question }}">
-            {{ v.bill_title or v.question or v.vote_id }}
-          </div>
-          <div class="flex gap-2 mt-0.5">
-            {% if v.policy_area %}<span class="text-xs text-indigo-500">{{ v.policy_area }}</span>{% endif %}
-            <span class="text-xs text-slate-400">{{ v.vote_date or "—" }}</span>
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="px-5 py-10 text-center text-slate-400 text-sm">No vote records.</div>
-    {% endif %}
-  </details>
-
-</div>
-
-<!-- ── Stock Trades ────────────────────────────────────────────────── -->
-{% if report.recent_transactions %}
-<details open class="bg-white border border-slate-200 rounded-xl shadow-sm mb-5 overflow-hidden">
-  <summary class="px-5 py-4 border-b border-slate-100 flex items-center justify-between cursor-pointer list-none">
-    <div class="font-semibold text-sm text-slate-700">
-      Stock Trades (STOCK Act)
-      <span class="ml-2 text-xs text-slate-400 font-normal">{{ report.recent_transactions | length }} shown</span>
-    </div>
-    <div class="flex gap-4 text-xs text-slate-500">
-      <span class="text-green-600 font-semibold">↑ {{ report.trading.buy_count }} buys</span>
-      <span class="text-red-500 font-semibold">↓ {{ report.trading.sell_count }} sells</span>
-    </div>
-  </summary>
-  <div class="overflow-x-auto max-h-72">
-    <table class="w-full text-xs">
-      <thead class="sticky top-0 bg-slate-50 border-b border-slate-100">
-        <tr class="text-slate-500 uppercase tracking-wide">
-          <th class="px-4 py-2.5 text-left font-semibold">Date</th>
-          <th class="px-4 py-2.5 text-left font-semibold">Ticker</th>
-          <th class="px-4 py-2.5 text-left font-semibold">Asset</th>
-          <th class="px-4 py-2.5 text-left font-semibold">Type</th>
-          <th class="px-4 py-2.5 text-left font-semibold">Amount</th>
-          <th class="px-4 py-2.5 text-left font-semibold">Owner</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-50">
-        {% for t in report.recent_transactions %}
-        <tr class="hover:bg-slate-50">
-          <td class="px-4 py-2 text-slate-500">{{ t.transaction_date or "—" }}</td>
-          <td class="px-4 py-2 font-mono font-bold text-slate-800">{{ t.ticker or "—" }}</td>
-          <td class="px-4 py-2 text-slate-500 max-w-[200px] truncate" title="{{ t.asset_name }}">{{ t.asset_name or "—" }}</td>
-          <td class="px-4 py-2">
-            {% if t.transaction_type == "purchase" %}<span class="text-green-600 font-semibold">↑ Buy</span>
-            {% elif "sale" in (t.transaction_type or "") %}<span class="text-red-500 font-semibold">↓ Sell</span>
-            {% else %}<span class="text-slate-400">{{ t.transaction_type or "—" }}</span>{% endif %}
-          </td>
-          <td class="px-4 py-2 text-slate-600">
-            {% if t.amount_min %}${{ "{:,.0f}".format(t.amount_min) }}{% endif %}
-            {% if t.amount_max %} – ${{ "{:,.0f}".format(t.amount_max) }}{% endif %}
-          </td>
-          <td class="px-4 py-2 text-slate-400 capitalize">{{ t.owner or "self" }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</details>
-{% endif %}
-
-<!-- ── All assets ──────────────────────────────────────────────────── -->
+<!-- ── 8. ALL DISCLOSED ASSETS ──────────────────────────────────────── -->
 {% if report.assets %}
-<details open class="bg-white border border-slate-200 rounded-xl shadow-sm mb-5 overflow-hidden">
-  <summary class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700 cursor-pointer list-none">
-    All Disclosed Assets
-    <span class="ml-2 text-xs text-slate-400 font-normal">{{ report.assets | length }} holdings</span>
+<details class="card mb-5 overflow-hidden">
+  <summary style="padding:0.875rem 1.25rem; border-bottom:1px solid #f3f4f6; cursor:pointer; list-style:none; display:flex; align-items:center; gap:0.5rem; font-family:system-ui,sans-serif;">
+    <span style="font-family:Georgia,serif; font-size:1rem; font-weight:700; color:#166534;">All Disclosed Assets</span>
+    <span style="font-size:0.75rem; color:#9ca3af;">{{ report.assets | length }} holdings</span>
   </summary>
-  <div class="overflow-x-auto max-h-72">
-    <table class="w-full text-xs">
-      <thead class="sticky top-0 bg-slate-50 border-b border-slate-100">
-        <tr class="text-slate-500 uppercase tracking-wide">
-          <th class="px-4 py-2.5 text-left font-semibold">Asset</th>
-          <th class="px-4 py-2.5 text-left font-semibold">Ticker</th>
-          <th class="px-4 py-2.5 text-left font-semibold">Sector</th>
-          <th class="px-4 py-2.5 text-left font-semibold">Value Range</th>
-          <th class="px-4 py-2.5 text-left font-semibold">Owner</th>
+  <div style="overflow-x:auto; max-height:300px; overflow-y:auto;">
+    <table style="width:100%; border-collapse:collapse; font-family:system-ui,sans-serif; font-size:0.78rem;">
+      <thead style="position:sticky; top:0; background:#f9fafb;">
+        <tr style="border-bottom:1px solid #e5e7eb;">
+          <th style="padding:0.4rem 1rem; text-align:left; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Asset</th>
+          <th style="padding:0.4rem 0.75rem; text-align:left; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Ticker</th>
+          <th style="padding:0.4rem 0.75rem; text-align:left; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Sector</th>
+          <th style="padding:0.4rem 0.75rem; text-align:right; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Value Range</th>
+          <th style="padding:0.4rem 0.75rem; text-align:left; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Owner</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-50">
+      <tbody>
         {% for a in report.all_assets_sorted %}
-        <tr class="hover:bg-slate-50">
-          <td class="px-4 py-2 text-slate-700 max-w-[200px] truncate" title="{{ a.asset_name }}">{{ a.asset_name }}</td>
-          <td class="px-4 py-2 font-mono font-bold text-slate-800">{{ a.ticker or "—" }}</td>
-          <td class="px-4 py-2 text-slate-500">{{ (a.sector or "—") | replace("_", " ") | title }}</td>
-          <td class="px-4 py-2 text-slate-500">
+        <tr style="border-bottom:1px solid #f9fafb;" onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background=''">
+          <td style="padding:0.45rem 1rem; color:#374151; max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ a.asset_name }}">{{ a.asset_name }}</td>
+          <td style="padding:0.45rem 0.75rem; font-family:monospace; font-weight:700; color:#111827;">{{ a.ticker or "—" }}</td>
+          <td style="padding:0.45rem 0.75rem; color:#6b7280;">{{ (a.sector or "—") | replace("_", " ") | title }}</td>
+          <td style="padding:0.45rem 0.75rem; text-align:right; color:#6b7280;">
             {% if a.value_min %}${{ "{:,.0f}".format(a.value_min) }}{% endif %}
             {% if a.value_max %} – ${{ "{:,.0f}".format(a.value_max) }}{% endif %}
           </td>
-          <td class="px-4 py-2 text-slate-400 capitalize">{{ a.owner or "self" }}</td>
+          <td style="padding:0.45rem 0.75rem; color:#9ca3af; text-transform:capitalize;">{{ a.owner or "self" }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -634,45 +476,99 @@
 </details>
 {% endif %}
 
-<!-- ── Export links ────────────────────────────────────────────────── -->
-<div class="flex gap-3 text-sm mb-6">
-  <a href="/api/members/{{ report.member.bioguide_id }}/report" target="_blank"
-     class="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-slate-600 hover:border-blue-400 hover:text-blue-600 transition-colors shadow-sm">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-    Download JSON
+<!-- ── 9. ELECTION HISTORY ───────────────────────────────────────────── -->
+{% if report.election_history %}
+<div style="margin-bottom:1.5rem;">
+  <div class="section-header">
+    <span class="section-title">Election History</span>
+    <span class="section-sub">{{ report.election_history | length }} races on record</span>
+  </div>
+  <div class="card overflow-hidden">
+    <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-family:system-ui,sans-serif; font-size:0.82rem;">
+        <thead>
+          <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
+            <th style="padding:0.5rem 1rem; text-align:left; font-size:0.67rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Year</th>
+            <th style="padding:0.5rem 1rem; text-align:left; font-size:0.67rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Race</th>
+            <th style="padding:0.5rem 1rem; text-align:left; font-size:0.67rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Outcome</th>
+            <th style="padding:0.5rem 1rem; text-align:right; font-size:0.67rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Vote %</th>
+            <th style="padding:0.5rem 1rem; text-align:left; font-size:0.67rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Top Opponent</th>
+            <th style="padding:0.5rem 1rem; text-align:right; font-size:0.67rem; text-transform:uppercase; letter-spacing:0.07em; color:#6b7280; font-weight:600;">Margin</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in report.election_history %}
+          <tr style="border-bottom:1px solid #f9fafb;" onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background=''">
+            <td style="padding:0.55rem 1rem; font-weight:600; color:#374151;">
+              {{ e.cycle }}
+              {% if e.special %}<span style="font-size:0.65rem; background:#fef3c7; color:#92400e; padding:1px 5px; border-radius:3px; margin-left:4px;">Special</span>{% endif %}
+            </td>
+            <td style="padding:0.55rem 1rem; color:#374151;">
+              {{ e.office }}{% if e.district %} – Dist. {{ e.district }}{% endif %}
+              <span style="font-size:0.68rem; color:#9ca3af; margin-left:4px;">{{ e.stage }}</span>
+            </td>
+            <td style="padding:0.55rem 1rem;">
+              {% if e.winner %}
+              <span style="color:#15803d; font-weight:700; font-size:0.8rem;">Won</span>
+              {% else %}
+              <span style="color:#b91c1c; font-weight:700; font-size:0.8rem;">Lost</span>
+              {% endif %}
+            </td>
+            <td style="padding:0.55rem 1rem; text-align:right; color:#374151;">
+              {% if e.vote_pct is not none %}{{ "%.1f"|format(e.vote_pct) }}%{% else %}—{% endif %}
+            </td>
+            <td style="padding:0.55rem 1rem; color:#6b7280; font-size:0.78rem;">
+              {% if e.top_opponent %}
+                {{ e.top_opponent.name }}
+                {% if e.top_opponent.party %}<span class="badge-{{ e.top_opponent.party }}" style="margin-left:4px;">{{ e.top_opponent.party }}</span>{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td style="padding:0.55rem 1rem; text-align:right; color:#374151; font-size:0.78rem;">
+              {% if e.margin is not none %}
+                {% if e.margin > 0 %}+{% endif %}{{ "{:,}".format(e.margin) }}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── 10. EXPORT ────────────────────────────────────────────────────── -->
+<div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:2rem; font-family:system-ui,sans-serif;">
+  <a href="/api/members/{{ report.member.bioguide_id }}/report" target="_blank" class="pill-btn" style="display:inline-flex; align-items:center; gap:0.4rem;">
+    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+    Full Report JSON
   </a>
-  <a href="/api/members/{{ report.member.bioguide_id }}/conflicts" target="_blank"
-     class="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-slate-600 hover:border-blue-400 hover:text-blue-600 transition-colors shadow-sm">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+  <a href="/api/members/{{ report.member.bioguide_id }}/conflicts" target="_blank" class="pill-btn" style="display:inline-flex; align-items:center; gap:0.4rem;">
+    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
     Signals JSON
   </a>
-  <a href="/members" class="flex items-center gap-2 text-slate-400 hover:text-slate-600 px-3 py-2.5 transition-colors">
-    ← All Members
-  </a>
+  <a href="/members" style="font-size:0.82rem; color:#9ca3af; text-decoration:none; padding:0.4rem 0.5rem; align-self:center;" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#9ca3af'">← All Members</a>
 </div>
 
-<!-- ── Charts ─────────────────────────────────────────────────────── -->
+<!-- ── CHARTS ───────────────────────────────────────────────────────── -->
 <script>
 (function () {
   const SECTOR_COLORS = {
-    information_technology: '#6366f1',
-    financials: '#0ea5e9',
-    health_care: '#10b981',
-    energy: '#f59e0b',
-    consumer_discretionary: '#f97316',
-    consumer_staples: '#84cc16',
-    communication_services: '#8b5cf6',
-    industrials: '#64748b',
-    materials: '#a16207',
-    real_estate: '#ec4899',
-    utilities: '#06b6d4',
-    diversified: '#94a3b8',
-    other: '#cbd5e1',
+    information_technology: '#15803d', financials: '#16a34a', health_care: '#22c55e',
+    energy: '#f59e0b', consumer_discretionary: '#f97316', consumer_staples: '#84cc16',
+    communication_services: '#14b8a6', industrials: '#64748b', materials: '#a16207',
+    real_estate: '#ec4899', utilities: '#06b6d4', diversified: '#94a3b8',
+    fixed_income: '#94a3b8', cash: '#cbd5e1', unknown: '#e2e8f0',
   };
-  const TYPE_COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#f97316','#8b5cf6'];
+  const TYPE_COLORS = ['#15803d','#22c55e','#4ade80','#86efac','#bbf7d0','#dcfce7'];
 
   const sectorData = {{ report.portfolio.by_sector | tojson }};
   const typeData   = {{ report.portfolio.by_type   | tojson }};
+
+  const chartDefaults = {
+    plugins: { legend: { display: false } },
+    animation: { duration: 400 },
+  };
 
   if (document.getElementById('sectorChart') && Object.keys(sectorData).length) {
     new Chart(document.getElementById('sectorChart'), {
@@ -682,19 +578,15 @@
         datasets: [{
           data: Object.values(sectorData),
           backgroundColor: Object.keys(sectorData).map(k => SECTOR_COLORS[k] || '#94a3b8'),
-          borderRadius: 4,
-          borderSkipped: false,
+          borderRadius: 3, borderSkipped: false,
         }]
       },
       options: {
-        indexAxis: 'y',
-        responsive: true,
-        plugins: { legend: { display: false }, tooltip: {
-          callbacks: { label: ctx => ' $' + ctx.raw.toLocaleString() }
-        }},
+        indexAxis: 'y', responsive: true,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' $' + ctx.raw.toLocaleString() } } },
         scales: {
-          x: { ticks: { callback: v => '$' + (v >= 1e6 ? (v/1e6).toFixed(1)+'M' : (v/1e3).toFixed(0)+'K') }, grid: { color: '#f1f5f9' } },
-          y: { grid: { display: false } }
+          x: { ticks: { callback: v => '$' + (v >= 1e6 ? (v/1e6).toFixed(1)+'M' : (v/1e3).toFixed(0)+'K'), font: { size: 10 } }, grid: { color: '#f3f4f6' } },
+          y: { ticks: { font: { size: 10 } }, grid: { display: false } }
         }
       }
     });
@@ -705,20 +597,15 @@
       type: 'doughnut',
       data: {
         labels: Object.keys(typeData).map(k => k.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())),
-        datasets: [{
-          data: Object.values(typeData),
-          backgroundColor: TYPE_COLORS,
-          borderWidth: 2,
-          borderColor: '#fff',
-        }]
+        datasets: [{ data: Object.values(typeData), backgroundColor: TYPE_COLORS, borderWidth: 2, borderColor: '#fff' }]
       },
       options: {
         responsive: true,
         plugins: {
-          legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+          legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
           tooltip: { callbacks: { label: ctx => ' $' + ctx.raw.toLocaleString() } }
         },
-        cutout: '60%',
+        cutout: '62%',
       }
     });
   }

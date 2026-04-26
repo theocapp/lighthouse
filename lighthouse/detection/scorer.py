@@ -19,6 +19,7 @@ RULE_WEIGHTS: dict[str, float] = {
     "sponsorship_holding": 0.90,
     "committee_donor": 0.65,
     "family_holding": 0.75,
+    "pattern_holding": 1.10,
 }
 
 
@@ -93,8 +94,70 @@ def score_candidates(
             "detail_json": json.dumps(detail),
         })
 
+    results = _add_pattern_signals(results)
     results.sort(key=lambda x: x["score"], reverse=True)
     return results
+
+
+def _add_pattern_signals(results: list[dict]) -> list[dict]:
+    """
+    If a ticker appears in 3+ vote_holding signals for the same member,
+    consolidate into a single pattern_holding signal with a boosted score.
+    """
+    from collections import defaultdict
+
+    ticker_signals: dict[str, list[dict]] = defaultdict(list)
+    for r in results:
+        if r["conflict_type"] == "vote_holding":
+            detail = json.loads(r.get("detail_json") or "{}")
+            ticker = detail.get("ticker") or ""
+            if ticker:
+                ticker_signals[ticker].append(r)
+
+    pattern_results = []
+    for ticker, signals in ticker_signals.items():
+        if len(signals) < 3:
+            continue
+
+        signals_sorted = sorted(signals, key=lambda x: x["score"], reverse=True)
+        scores = [s["score"] for s in signals_sorted]
+        # Lead signal carries full weight; each additional decays
+        pattern_score = min(scores[0] + 0.3 * sum(scores[1:]), 100.0)
+        pattern_score = round(pattern_score * RULE_WEIGHTS["pattern_holding"], 2)
+
+        best = signals_sorted[0]
+        best_detail = json.loads(best.get("detail_json") or "{}")
+        pattern_detail = {
+            **best_detail,
+            "pattern_vote_count": len(signals),
+            "pattern_ticker": ticker,
+        }
+
+        val = best_detail.get("value_max")
+        sector = best_detail.get("sector", "sector")
+        summary = (
+            f"Repeated pattern: voted on {len(signals)} {sector} bills "
+            f"while holding {ticker} (max ${val:,.0f})"
+            if val else
+            f"Repeated pattern: voted on {len(signals)} {sector} bills while holding {ticker}"
+        )
+
+        confidence = "high" if pattern_score >= 53 else "medium" if pattern_score >= 35 else "low"
+        pattern_results.append({
+            "conflict_type": "pattern_holding",
+            "score": pattern_score,
+            "confidence": confidence,
+            "vote_id": None,
+            "bill_id": None,
+            "asset_id": best.get("asset_id"),
+            "transaction_id": None,
+            "contribution_id": None,
+            "evidence_summary": summary,
+            "signal_strength": signal_strength_from_score(pattern_score),
+            "detail_json": json.dumps(pattern_detail),
+        })
+
+    return results + pattern_results
 
 
 def _summarize(c: ConflictCandidate) -> str:

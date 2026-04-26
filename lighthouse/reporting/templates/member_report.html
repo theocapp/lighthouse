@@ -216,7 +216,7 @@
         <tr>
           <th>Asset</th>
           <th>Ticker</th>
-          <th>Type</th>
+          <th>Asset Class</th>
           <th>Value Range</th>
           <th>Owner</th>
           <th>Sector</th>
@@ -228,13 +228,13 @@
         <tr>
           <td style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.asset_name }}</td>
           <td><strong>{{ a.ticker or '—' }}</strong></td>
-          <td>{{ a.asset_type or '—' }}</td>
+          <td>{{ a.asset_class or a.asset_type or 'Unknown' }}</td>
           <td style="font-size:0.82rem; color:#555;">
             {% if a.value_min %}${{ '{:,.0f}'.format(a.value_min) }} – {% endif %}
             {% if a.value_max %}${{ '{:,.0f}'.format(a.value_max) }}{% endif %}
           </td>
           <td>{{ a.owner or 'self' }}</td>
-          <td>{{ a.sector or '—' }}</td>
+          <td>{{ (a.sector or 'Unknown') | replace('_', ' ') | title }}</td>
           <td>{{ a.year or '—' }}</td>
         </tr>
         {% endfor %}
